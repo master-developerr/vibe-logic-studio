@@ -114,12 +114,16 @@ h1,h2,h3 { font-weight:600; letter-spacing:-.06em; }.eyebrow { letter-spacing:.1
 .whatsapp-bar { background:#efece6; }.message { border-radius:4px 10px 10px 10px; }.footer .brand-mark { width:34px; height:34px; }
 
 @media (max-width:800px) {
-  /* Let the ambient orange field span the entire card rather than ending as a clipped corner glow. */
-  .course-info {
+  /* The ambient field belongs to the complete offer, not only its headline panel. */
+  .bootcamp-card {
     background:
-      radial-gradient(130% 115% at 4% 104%, rgba(255, 90, 31, .72) 0%, rgba(255, 90, 31, .38) 35%, rgba(255, 90, 31, .11) 64%, rgba(255, 90, 31, 0) 100%),
-      linear-gradient(135deg, #211713 0%, #121212 76%);
+      radial-gradient(118% 74% at -12% 46%, rgba(255, 90, 31, .66) 0%, rgba(255, 90, 31, .32) 37%, rgba(255, 90, 31, .09) 66%, rgba(255, 90, 31, 0) 100%),
+      linear-gradient(135deg, #251712 0%, #121212 74%);
   }
+  .course-info {
+    background:transparent;
+  }
+  .course-details { background:transparent; }
 }
 
 @media (max-width:480px) {
@@ -128,16 +132,22 @@ h1,h2,h3 { font-weight:600; letter-spacing:-.06em; }.eyebrow { letter-spacing:.1
     height:40px;
     min-height:40px;
     padding:0;
+    gap:0;
     display:flex;
+    flex:0 0 40px;
     align-items:center;
     justify-content:center;
     line-height:0;
+    font-size:0;
+    border-radius:50%;
   }
   .nav-cta svg {
     display:block;
+    width:18px;
+    height:18px;
     flex:none;
     margin:0;
-    transform:translateX(1px);
+    transform:translateX(.5px);
   }
-  .nav-cta:hover svg { transform:translateX(1px); }
+  .nav-cta:hover svg { transform:translateX(.5px); }
 }
