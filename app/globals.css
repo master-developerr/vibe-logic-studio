@@ -112,3 +112,32 @@ h1,h2,h3 { font-weight:600; letter-spacing:-.06em; }.eyebrow { letter-spacing:.1
 .coming-card,.review-card { background:var(--cream); border:1px solid var(--border); border-radius:12px; }.coming-card button { border-radius:8px; background:#ece9e3; }.learn-section { background:var(--surface); border-block:1px solid var(--border); }.curriculum-list,.curriculum-list>div,.faq,.faq-list,.faq details { border-color:var(--border); }
 .tech-section { background:var(--ink); }.course-tags span { border-radius:8px; }.course-details .button-primary,.final-cta .button { background:var(--ember); color:var(--ink); }.course-details .button-primary .button-icon,.final-cta .button-icon { background:var(--ink); color:var(--cream); }
 .whatsapp-bar { background:#efece6; }.message { border-radius:4px 10px 10px 10px; }.footer .brand-mark { width:34px; height:34px; }
+
+@media (max-width:800px) {
+  /* Let the ambient orange field span the entire card rather than ending as a clipped corner glow. */
+  .course-info {
+    background:
+      radial-gradient(130% 115% at 4% 104%, rgba(255, 90, 31, .72) 0%, rgba(255, 90, 31, .38) 35%, rgba(255, 90, 31, .11) 64%, rgba(255, 90, 31, 0) 100%),
+      linear-gradient(135deg, #211713 0%, #121212 76%);
+  }
+}
+
+@media (max-width:480px) {
+  .nav-cta {
+    width:40px;
+    height:40px;
+    min-height:40px;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:0;
+  }
+  .nav-cta svg {
+    display:block;
+    flex:none;
+    margin:0;
+    transform:translateX(1px);
+  }
+  .nav-cta:hover svg { transform:translateX(1px); }
+}
