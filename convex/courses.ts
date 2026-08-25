@@ -42,15 +42,6 @@ export const getBySlug = query({
   handler: async (ctx, args) => {
     let course = await ctx.db.query("courses").withIndex("by_slug", (query) => query.eq("slug", args.slug)).unique();
     
-    // Alias fallback for flagship course (build-software-with-ai <-> ai-build-sprint)
-    if (!course) {
-      if (args.slug === "build-software-with-ai") {
-        course = await ctx.db.query("courses").withIndex("by_slug", (query) => query.eq("slug", "ai-build-sprint")).unique();
-      } else if (args.slug === "ai-build-sprint") {
-        course = await ctx.db.query("courses").withIndex("by_slug", (query) => query.eq("slug", "build-software-with-ai")).unique();
-      }
-    }
-
     // Try finding by ID if slug might be an ID string
     if (!course) {
       try {

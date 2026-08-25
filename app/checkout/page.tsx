@@ -14,7 +14,7 @@ export default async function CheckoutPage({
 }) {
   const { userId, getToken } = await auth();
   const params = await searchParams;
-  const targetCourseQuery = params.courseSlug || params.courseId || "build-software-with-ai";
+  const targetCourseQuery = params.courseSlug || params.courseId || "ai-build-sprint";
 
   const token = (await getToken({ template: "convex" })) ?? undefined;
 
