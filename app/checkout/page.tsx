@@ -172,6 +172,32 @@ function CheckoutPageContent() {
     );
   }
 
+  // STATE: CHECKING PAYMENT STATUS
+  if (checkoutStatus === undefined) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+          <h2 className="text-xl font-bold text-text-primary">Checking enrollment status...</h2>
+          <p className="text-sm text-text-secondary">Please wait while we verify your account.</p>
+        </div>
+      </main>
+    );
+  }
+
+  // STATE: ALREADY ENROLLED / PAID
+  if (checkoutStatus && (checkoutStatus.hasActiveEnrollment || checkoutStatus.hasSuccessfulPayment)) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+          <h2 className="text-xl font-bold text-text-primary">Redirecting...</h2>
+          <p className="text-sm text-text-secondary">You already have access to this course. Sending you to the dashboard.</p>
+        </div>
+      </main>
+    );
+  }
+
   // STATE: READY
   // The actual batchId is assigned above.
   const subtotal = course.price;
