@@ -75,7 +75,7 @@ function CheckoutPageContent() {
 
   const checkoutStatus = useQuery(
     api.payments.getCheckoutStatus,
-    course && batchId
+    isSignedIn && course && batchId
       ? { courseId: course.id as Id<"courses">, batchId: batchId as Id<"batches"> }
       : "skip"
   );
