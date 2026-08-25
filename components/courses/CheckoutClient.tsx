@@ -87,11 +87,34 @@ export function CheckoutClient({
         name: "VibeLogic Studio",
         description: data.courseTitle,
         order_id: data.orderId,
-        handler: function (paymentResponse: any) {
-          // Redirect student directly to course overview workspace upon successful payment verification.
-          // The webhook handles the database insertion, and because Convex is real-time, the
-          // workspace will immediately load with active enrolled states.
-          window.location.href = `/dashboard/courses/${batchId}/overview?success=true`;
+        handler: async function (paymentResponse: any) {
+          try {
+            // Verify payment on the server synchronously before redirecting
+            const verifyRes = await fetch("/api/checkout/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_signature: paymentResponse.razorpay_signature,
+                courseSlug,
+                batchId,
+              }),
+            });
+
+            if (!verifyRes.ok) {
+              const errData = await verifyRes.json();
+              throw new Error(errData.error || "Payment verification failed");
+            }
+
+            // Backend verified the payment, updated Convex, and created the enrollment.
+            // It's safe to immediately redirect to the course overview.
+            window.location.href = `/dashboard/courses/${batchId}/overview?success=true`;
+          } catch (verifyErr: any) {
+            console.error("Payment verification error:", verifyErr);
+            setError(verifyErr.message || "Payment verified locally but failed to sync. Contact support.");
+            setIsPending(false);
+          }
         },
         prefill: {
           name: studentName,

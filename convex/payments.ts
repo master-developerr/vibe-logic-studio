@@ -249,3 +249,131 @@ export const getCheckoutStatus = query({
     };
   },
 });
+
+/**
+ * Synchronously confirms a payment initiated from the frontend and fulfills enrollment.
+ * Used by the secure checkout API to lock in the enrollment before redirecting the user.
+ */
+export const confirmPayment = mutation({
+  args: {
+    razorpayOrderId: v.string(),
+    razorpayPaymentId: v.string(),
+    courseId: v.id("courses"),
+    batchId: v.id("batches"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const existingPayment = await ctx.db
+      .query("payments")
+      .filter((q) => q.eq(q.field("razorpayOrderId"), args.razorpayOrderId))
+      .first();
+
+    if (!existingPayment) {
+      throw new Error("Payment order not found");
+    }
+
+    if (existingPayment.userId !== user._id) {
+      throw new Error("Payment order does not belong to the authenticated user");
+    }
+
+    const amount = existingPayment.amount;
+    const taxAmount = Math.round(amount * 0.18);
+    const netAmount = amount - taxAmount;
+
+    // 1. Mark payment as successful
+    await ctx.db.patch(existingPayment._id, {
+      status: "successful",
+      razorpayOrderId: args.razorpayOrderId,
+      paymentMethod: "Razorpay Checkout", // Updated by webhook later with precise method if needed
+      taxAmount,
+      netAmount,
+      payoutStatus: "Pending",
+    });
+
+    const paymentId = existingPayment._id;
+
+    // 2. Verify if user is already enrolled
+    const existingEnrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("courseId"), args.courseId))
+      .first();
+
+    if (existingEnrollment) {
+      if (existingEnrollment.status !== "active") {
+        await ctx.db.patch(existingEnrollment._id, {
+          status: "active",
+          batchId: args.batchId,
+          paymentId,
+        });
+
+        const batch = await ctx.db.get(args.batchId);
+        if (batch) {
+          if (batch.enrolledCount >= batch.capacity) {
+            await ctx.db.patch(existingEnrollment._id, {
+              notes: "OVERFLOW: Batch reached capacity. Needs manual review.",
+            });
+          } else {
+            await ctx.db.patch(args.batchId, {
+              enrolledCount: batch.enrolledCount + 1,
+            });
+          }
+        }
+      }
+      return { success: true, enrollmentId: existingEnrollment._id };
+    }
+
+    // 3. Create new enrollment
+    const enrollmentId = await ctx.db.insert("enrollments", {
+      userId: user._id,
+      courseId: args.courseId,
+      batchId: args.batchId,
+      paymentId,
+      status: "active",
+      progress: 0,
+      enrolledAt: Date.now(),
+      completedLessons: [],
+    });
+
+    // 4. Update batch count
+    const batch = await ctx.db.get(args.batchId);
+    if (batch) {
+      if (batch.enrolledCount >= batch.capacity) {
+        await ctx.db.patch(enrollmentId, {
+          notes: "OVERFLOW: Batch reached capacity. Needs manual review.",
+        });
+      } else {
+        await ctx.db.patch(args.batchId, {
+          enrolledCount: batch.enrolledCount + 1,
+        });
+      }
+    }
+
+    // 5. Log enrollment activity
+    const course = await ctx.db.get(args.courseId);
+    await ctx.db.insert("activities", {
+      userId: user._id,
+      courseId: args.courseId,
+      batchId: args.batchId,
+      type: "Lesson Completed", 
+      title: `Enrolled in course: ${course?.title || "Course"}`,
+      timestamp: Date.now(),
+      resourceId: enrollmentId,
+    });
+
+    return { success: true, enrollmentId };
+  },
+});

@@ -20,3 +20,25 @@ export function verifyRazorpaySignature(body: string, signature: string | null, 
     
   return expectedSignature === signature;
 }
+
+/**
+ * Verifies the signature of a Razorpay payment success callback.
+ * 
+ * @param orderId The order ID returned from Razorpay.
+ * @param paymentId The payment ID returned from Razorpay.
+ * @param signature The signature from Razorpay callback.
+ * @param secret The webhook secret or key secret configured in Razorpay.
+ * @returns boolean indicating if the signature is valid.
+ */
+export function verifyRazorpayPaymentSignature(orderId: string, paymentId: string, signature: string, secret: string): boolean {
+  if (!signature || !orderId || !paymentId) {
+    return false;
+  }
+  
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(orderId + "|" + paymentId)
+    .digest("hex");
+    
+  return expectedSignature === signature;
+}
