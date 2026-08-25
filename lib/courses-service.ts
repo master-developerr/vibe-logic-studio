@@ -1,6 +1,6 @@
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { redis } from "./redis";
+import { redis, isDynamicServerError } from "./redis";
 import type { Course } from "./course-data";
 
 const CACHE_TTL = 60; // 60 seconds
@@ -15,6 +15,9 @@ export async function getMarketplaceCourses(category: string, query: string): Pr
         return cached as Course[];
       }
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache error:", error);
     }
   }
@@ -40,6 +43,9 @@ export async function getMarketplaceCourses(category: string, query: string): Pr
     try {
       await redis.set(cacheKey, formattedCourses, { ex: CACHE_TTL });
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache set error:", error);
     }
   }
@@ -57,6 +63,9 @@ export async function getCourseDetails(slug: string): Promise<Course | null> {
         return cached as Course;
       }
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache error:", error);
     }
   }
@@ -81,6 +90,9 @@ export async function getCourseDetails(slug: string): Promise<Course | null> {
     try {
       await redis.set(cacheKey, formattedCourse, { ex: CACHE_TTL });
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache set error:", error);
     }
   }

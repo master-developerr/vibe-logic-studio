@@ -2,7 +2,7 @@
 
 import { fetchQuery, fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { redis } from "./redis";
+import { redis, isDynamicServerError } from "./redis";
 import type { Id } from "@/convex/_generated/dataModel";
 
 const CACHE_TTL = 60 * 5; // 5 minutes for student dashboard to keep it fresh
@@ -17,6 +17,9 @@ export async function getStudentDashboard(clerkId: string, token?: string): Prom
         return cached;
       }
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache error:", error);
     }
   }
@@ -52,6 +55,9 @@ export async function getStudentDashboard(clerkId: string, token?: string): Prom
     try {
       await redis.set(cacheKey, formattedData, { ex: CACHE_TTL });
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache set error:", error);
     }
   }
@@ -69,6 +75,9 @@ export async function getCourseLMS(clerkId: string, courseId: string, token?: st
         return cached;
       }
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache error:", error);
     }
   }
@@ -93,6 +102,9 @@ export async function getCourseLMS(clerkId: string, courseId: string, token?: st
     try {
       await redis.set(cacheKey, formattedData, { ex: CACHE_TTL });
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache set error:", error);
     }
   }
@@ -110,6 +122,9 @@ export async function getBatchLMS(clerkId: string, batchId: string, token?: stri
         return cached;
       }
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache error:", error);
     }
   }
@@ -137,6 +152,9 @@ export async function getBatchLMS(clerkId: string, batchId: string, token?: stri
     try {
       await redis.set(cacheKey, formattedData, { ex: CACHE_TTL });
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache set error:", error);
     }
   }
@@ -154,6 +172,9 @@ export async function getCourseDashboardContext(clerkId: string, batchId: string
         return cached;
       }
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache error:", error);
     }
   }
@@ -190,6 +211,9 @@ export async function getCourseDashboardContext(clerkId: string, batchId: string
     try {
       await redis.set(cacheKey, formattedData, { ex: CACHE_TTL });
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache set error:", error);
     }
   }
@@ -206,6 +230,9 @@ export async function updateStudentProfile(clerkId: string, name: string, avatar
       const cacheKey = `student:dashboard:${clerkId}`;
       await redis.del(cacheKey);
     } catch (error) {
+      if (isDynamicServerError(error)) {
+        throw error;
+      }
       console.error("Redis cache deletion error:", error);
     }
   }
