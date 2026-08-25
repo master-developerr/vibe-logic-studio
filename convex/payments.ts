@@ -1,20 +1,24 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
  * Creates a pending payment record in the database when a checkout is initiated.
  */
-export const createPendingPayment = internalMutation({
+export const createPendingPayment = mutation({
   args: {
-    clerkId: v.string(),
     razorpayOrderId: v.string(),
     amount: v.number(),
     courseId: v.id("courses"),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
     if (!user) {
@@ -190,5 +194,58 @@ export const fulfillEnrollment = internalMutation({
     });
 
     return { success: true, enrollmentId };
+  },
+});
+
+/**
+ * Checks if the authenticated user already has an active enrollment or successful payment for a course/batch.
+ * This is used to bypass the checkout UI and prevent duplicate payments.
+ */
+export const getCheckoutStatus = query({
+  args: {
+    courseId: v.id("courses"),
+    batchId: v.id("batches"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) return null;
+
+    // 1. Check for active enrollment
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("courseId"), args.courseId))
+      .first();
+
+    const hasActiveEnrollment = enrollment?.status === "active";
+
+    // 2. Check for successful payment
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("courseId"), args.courseId),
+          q.eq(q.field("status"), "successful")
+        )
+      )
+      .first();
+
+    const hasSuccessfulPayment = !!payment;
+
+    return {
+      hasActiveEnrollment,
+      hasSuccessfulPayment,
+      enrollmentId: enrollment?._id,
+      batchId: enrollment?.batchId || args.batchId,
+      courseId: args.courseId,
+    };
   },
 });

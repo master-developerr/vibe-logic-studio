@@ -23,7 +23,6 @@ function CheckoutPageContent() {
 
   const syncUserMutation = useMutation(api.users.syncUser);
   const convexUser = useQuery(api.users.getUserByClerkId, userId ? { clerkId: userId } : "skip");
-  const existingEnrollment = useQuery(api.student.getCourseDashboardContext, requestedBatchId ? { batchId: requestedBatchId as Id<"batches"> } : "skip");
 
   // Auth Guard Effect
   useEffect(() => {
@@ -72,13 +71,21 @@ function CheckoutPageContent() {
     }
   }
 
-  // 3. Existing Enrollment Guard Effect
+  const batchId = targetBatch?._id || targetBatch?.id;
+
+  const checkoutStatus = useQuery(
+    api.payments.getCheckoutStatus,
+    course && batchId
+      ? { courseId: course.id as Id<"courses">, batchId: batchId as Id<"batches"> }
+      : "skip"
+  );
+
+  // 3. Existing Enrollment/Payment Guard Effect
   useEffect(() => {
-    if (existingEnrollment && targetBatch) {
-      const bid = targetBatch._id || targetBatch.id;
-      router.push(`/dashboard/courses/${bid}/overview`);
+    if (checkoutStatus && (checkoutStatus.hasActiveEnrollment || checkoutStatus.hasSuccessfulPayment)) {
+      router.push(`/dashboard/courses/${checkoutStatus.batchId}/overview`);
     }
-  }, [existingEnrollment, targetBatch, router]);
+  }, [checkoutStatus, router]);
 
   // STATE: AUTHENTICATING
   if (!isAuthLoaded || !isSignedIn) {
@@ -166,7 +173,7 @@ function CheckoutPageContent() {
   }
 
   // STATE: READY
-  const batchId = targetBatch._id || targetBatch.id;
+  // The actual batchId is assigned above.
   const subtotal = course.price;
   const tax = Math.round(subtotal * 0.18);
   const netAmount = subtotal - tax;

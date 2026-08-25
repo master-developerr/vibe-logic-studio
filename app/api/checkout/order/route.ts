@@ -77,13 +77,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const token = await (await auth()).getToken({ template: "convex" }) ?? undefined;
+
     // 3. Create pending payment record in Convex
-    await fetchMutation(internal.payments.createPendingPayment as any, {
-      clerkId,
+    await fetchMutation(api.payments.createPendingPayment, {
       razorpayOrderId: order.id,
       amount: course.price,
       courseId: course.id as Id<"courses">,
-    });
+    }, { token });
 
     return NextResponse.json({
       keyId: key_id,
