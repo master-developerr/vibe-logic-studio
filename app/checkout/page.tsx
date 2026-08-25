@@ -21,7 +21,7 @@ export default async function CheckoutPage({
   // 1. Fetch course details (includes batches)
   const course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
   if (!course) {
-    redirect("/marketplace");
+    redirect("/");
   }
 
   // 2. Locate or auto-select target batch
@@ -39,16 +39,16 @@ export default async function CheckoutPage({
   }
 
   if (!targetBatch) {
-    redirect(`/course/${course.slug}`);
+    redirect(course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint" ? "/build-software-with-ai" : "/");
   }
 
   const batchId = targetBatch._id || targetBatch.id;
 
 
   if (!userId) {
-    // If not authenticated, redirect to sign-in and redirect back to this checkout URL
+    // If not authenticated, redirect to sign-up and redirect back to this checkout URL
     const redirectUrl = encodeURIComponent(`/checkout?courseSlug=${course.slug}&batchId=${batchId}`);
-    redirect(`/sign-in?fallback_redirect_url=${redirectUrl}`);
+    redirect(`/sign-up?fallback_redirect_url=${redirectUrl}`);
   }
 
   // 3. Fetch user details from database
@@ -85,7 +85,7 @@ export default async function CheckoutPage({
         {/* Navigation & Header */}
         <div className="flex items-center justify-between border-b border-border/60 pb-6">
           <Link
-            href={`/course/${courseSlug}`}
+            href={courseSlug === "build-software-with-ai" || courseSlug === "ai-build-sprint" ? "/build-software-with-ai" : "/"}
             className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-text-secondary hover:text-text-primary transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />

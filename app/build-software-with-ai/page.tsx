@@ -68,7 +68,7 @@ export default async function BuildSoftwareWithAI() {
       <nav className="nav shell" aria-label="Primary navigation">
         <a className="brand" href="#top" aria-label="VibeLogic Studio home"><span className="brand-mark"><Icon name="spark" size={15} /></span>VibeLogic<span>Studio</span></a>
         <div className="nav-links"><a href="#bootcamp">Bootcamp</a><a href="#curriculum">Curriculum</a><a href="#reviews">Stories</a></div>
-        <Link href="/sign-up?fallback_redirect_url=/dashboard" className="nav-cta">Join the cohort <Icon name="arrow" size={14} /></Link>
+        <Link href="/checkout?courseSlug=build-software-with-ai" className="nav-cta">Join the cohort <Icon name="arrow" size={14} /></Link>
       </nav>
 
       <section className="hero shell" id="top">

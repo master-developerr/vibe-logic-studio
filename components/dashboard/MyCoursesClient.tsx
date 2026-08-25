@@ -277,7 +277,7 @@ export function MyCoursesClient({
                     </div>
                   ) : item.status === "AVAILABLE" ? (
                     <Link
-                      href={`/course/${item.slug}`}
+                      href={item.slug === "build-software-with-ai" || item.slug === "ai-build-sprint" ? "/build-software-with-ai" : `/course/${item.slug}`}
                       className="w-full inline-flex justify-center items-center py-3 px-4 rounded-[12px] text-sm font-semibold text-white bg-gray-900 hover:bg-black transition-colors shadow-sm"
                     >
                       Request Enrollment +

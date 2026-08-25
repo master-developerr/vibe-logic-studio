@@ -1,9 +1,17 @@
 import { SignIn } from "@clerk/nextjs";
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fallback_redirect_url?: string }>;
+}) {
+  const params = await searchParams;
+  const fallbackUrl = params.fallback_redirect_url || "/dashboard";
+
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <SignIn fallbackRedirectUrl="/dashboard" forceRedirectUrl="/dashboard" />
+      <SignIn fallbackRedirectUrl={fallbackUrl} />
     </div>
   );
 }
+
