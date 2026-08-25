@@ -173,7 +173,6 @@ function CheckoutPageContent() {
   }
 
   // STATE: READY
-  const batchId = targetBatch._id || targetBatch.id;
   const subtotal = course.price;
   const tax = Math.round(subtotal * 0.18);
   const netAmount = subtotal - tax;
