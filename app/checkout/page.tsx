@@ -23,7 +23,6 @@ function CheckoutPageContent() {
 
   const syncUserMutation = useMutation(api.users.syncUser);
   const convexUser = useQuery(api.users.getUserByClerkId, userId ? { clerkId: userId } : "skip");
-
   // Auth Guard Effect
   useEffect(() => {
     if (isAuthLoaded && !isSignedIn) {
@@ -80,9 +79,10 @@ function CheckoutPageContent() {
       : "skip"
   );
 
-  // 3. Existing Enrollment/Payment Guard Effect
+  // 3. Existing Payment Guard Effect
+  // Safely redirects to the dashboard only if the backend confirms they already paid successfully
   useEffect(() => {
-    if (checkoutStatus && (checkoutStatus.hasActiveEnrollment || checkoutStatus.hasSuccessfulPayment)) {
+    if (checkoutStatus?.hasSuccessfulPayment || checkoutStatus?.hasActiveEnrollment) {
       router.push(`/dashboard/courses/${checkoutStatus.batchId}/overview`);
     }
   }, [checkoutStatus, router]);
@@ -172,34 +172,8 @@ function CheckoutPageContent() {
     );
   }
 
-  // STATE: CHECKING PAYMENT STATUS
-  if (checkoutStatus === undefined) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
-          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
-          <h2 className="text-xl font-bold text-text-primary">Checking enrollment status...</h2>
-          <p className="text-sm text-text-secondary">Please wait while we verify your account.</p>
-        </div>
-      </main>
-    );
-  }
-
-  // STATE: ALREADY ENROLLED / PAID
-  if (checkoutStatus && (checkoutStatus.hasActiveEnrollment || checkoutStatus.hasSuccessfulPayment)) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
-          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
-          <h2 className="text-xl font-bold text-text-primary">Redirecting...</h2>
-          <p className="text-sm text-text-secondary">You already have access to this course. Sending you to the dashboard.</p>
-        </div>
-      </main>
-    );
-  }
-
   // STATE: READY
-  // The actual batchId is assigned above.
+  const batchId = targetBatch._id || targetBatch.id;
   const subtotal = course.price;
   const tax = Math.round(subtotal * 0.18);
   const netAmount = subtotal - tax;
