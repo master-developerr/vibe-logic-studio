@@ -21,7 +21,18 @@ export default async function CheckoutPage({
   // 1. Fetch course details (includes batches)
   const course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
   if (!course) {
-    redirect("/");
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <ShieldCheck className="w-12 h-12 text-error mx-auto opacity-50" />
+          <h2 className="text-xl font-bold text-text-primary">Course Not Found</h2>
+          <p className="text-sm text-text-secondary">The requested course could not be found or is currently inactive.</p>
+          <Link href="/" className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
+            Return to Homepage
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   // 2. Locate or auto-select target batch
@@ -39,7 +50,18 @@ export default async function CheckoutPage({
   }
 
   if (!targetBatch) {
-    redirect(course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint" ? "/build-software-with-ai" : "/");
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <ShieldCheck className="w-12 h-12 text-error mx-auto opacity-50" />
+          <h2 className="text-xl font-bold text-text-primary">No Upcoming Cohorts</h2>
+          <p className="text-sm text-text-secondary">This program currently has no active or upcoming cohorts available for enrollment.</p>
+          <Link href={`/${course.slug === "ai-build-sprint" ? "build-software-with-ai" : course.slug}`} className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
+            Return to Course Details
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   const batchId = targetBatch._id || targetBatch.id;
@@ -53,9 +75,20 @@ export default async function CheckoutPage({
   }
 
   // 3. Fetch user details from database
-  const user = await fetchQuery(api.users.getUserByClerkId, { clerkId: userId }, { token });
+  const user = await fetchQuery(api.users.getUserByClerkId, { clerkId: userId }, { token }).catch(() => null);
+
+  // If user is authenticated in Clerk but not yet in Convex (webhook delay), wait.
   if (!user) {
-    redirect("/sign-in");
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-text-primary">Preparing Checkout</h2>
+          <p className="text-sm text-text-secondary">Please wait a moment while we set up your account. This page will refresh automatically.</p>
+          <meta httpEquiv="refresh" content="2" />
+        </div>
+      </main>
+    );
   }
 
   // 4. Verify user is not already enrolled
