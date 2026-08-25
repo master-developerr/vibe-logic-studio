@@ -228,10 +228,11 @@ export const getAllStudents = query({
       const enrolledUserIds = new Set(allEnrollments.map((e) => e.userId.toString()));
       const studentsRaw = allUsers.filter(
         (u) =>
-          enrolledUserIds.has(u._id.toString()) ||
+          u.accountStatus !== "archived" && 
+          (enrolledUserIds.has(u._id.toString()) ||
           u.role === "student" ||
           u.role === "user" ||
-          (u.role !== "admin" && u.role !== "instructor")
+          (u.role !== "admin" && u.role !== "instructor"))
       );
 
       return await Promise.all(
@@ -354,6 +355,59 @@ export const updateStudentEnterprise = mutation({
 
     await ctx.db.patch(args.studentId, updateFields);
     return { success: true };
+  },
+});
+
+export const removeStudents = mutation({
+  args: {
+    studentIds: v.array(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const authUser = await requireAdminOrInstructor(ctx);
+
+    for (const studentId of args.studentIds) {
+      const student = await ctx.db.get(studentId);
+      if (!student) continue;
+
+      // Update the user record to be archived
+      await ctx.db.patch(studentId, {
+        accountStatus: "archived",
+        role: "archived",
+        adminNotes: [
+          ...(student.adminNotes || []),
+          {
+            text: "Student bulk removed by admin.",
+            authorId: authUser._id,
+            authorName: authUser.name,
+            createdAt: Date.now(),
+          },
+        ],
+      });
+
+      // Find all enrollments and mark them as dropped
+      const enrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_user_id", (q) => q.eq("userId", studentId))
+        .collect();
+
+      for (const enrollment of enrollments) {
+        if (enrollment.status === "active") {
+          await ctx.db.patch(enrollment._id, {
+            status: "dropped",
+          });
+          
+          // Decrement the batch's enrolled count
+          const batch = await ctx.db.get(enrollment.batchId);
+          if (batch && batch.enrolledCount > 0) {
+            await ctx.db.patch(batch._id, {
+              enrolledCount: batch.enrolledCount - 1,
+            });
+          }
+        }
+      }
+    }
+
+    return { success: true, removedCount: args.studentIds.length };
   },
 });
 

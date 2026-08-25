@@ -1,26 +1,140 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-import { fetchQuery } from "convex/nextjs";
+"use client";
+
+import { useAuth, useUser } from "@clerk/nextjs";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CheckoutClient } from "@/components/courses/CheckoutClient";
 import Link from "next/link";
-import { ChevronLeft, ShieldCheck, CreditCard } from "lucide-react";
+import { ChevronLeft, ShieldCheck, Loader2 } from "lucide-react";
+import { useEffect, useState, Suspense } from "react";
 
-export default async function CheckoutPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ courseSlug?: string; batchId?: string; courseId?: string }>;
-}) {
-  const { userId, getToken } = await auth();
-  const params = await searchParams;
-  const targetCourseQuery = params.courseSlug || params.courseId || "ai-build-sprint";
+function CheckoutPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isLoaded: isAuthLoaded, isSignedIn, userId } = useAuth();
+  const { user: clerkUser } = useUser();
+  
+  const targetCourseQuery = searchParams.get("courseSlug") || searchParams.get("courseId") || "ai-build-sprint";
+  const requestedBatchId = searchParams.get("batchId");
 
-  const token = (await getToken({ template: "convex" })) ?? undefined;
+  const [syncState, setSyncState] = useState<"idle" | "syncing" | "synced" | "error">("idle");
 
-  // 1. Fetch course details (includes batches)
-  const course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
-  if (!course) {
+  const syncUserMutation = useMutation(api.users.syncUser);
+  const convexUser = useQuery(api.users.getUserByClerkId, userId ? { clerkId: userId } : "skip");
+  const existingEnrollment = useQuery(api.student.getCourseDashboardContext, requestedBatchId ? { batchId: requestedBatchId as Id<"batches"> } : "skip");
+
+  // Auth Guard Effect
+  useEffect(() => {
+    if (isAuthLoaded && !isSignedIn) {
+      // Redirect to sign-in while preserving return URL
+      const currentUrl = `/checkout?courseSlug=${targetCourseQuery}${requestedBatchId ? `&batchId=${requestedBatchId}` : ""}`;
+      router.push(`/sign-up?redirect_url=${encodeURIComponent(currentUrl)}`);
+    }
+  }, [isAuthLoaded, isSignedIn, router, targetCourseQuery, requestedBatchId]);
+
+  // Sync user effect
+  useEffect(() => {
+    if (isAuthLoaded && isSignedIn && clerkUser && syncState === "idle" && convexUser === null) {
+      setSyncState("syncing");
+      syncUserMutation({
+        clerkId: clerkUser.id,
+        email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
+        name: `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim() || "Student",
+        avatarUrl: clerkUser.imageUrl ?? "",
+      })
+        .then(() => setSyncState("synced"))
+        .catch((e) => {
+          console.error("Failed to sync user:", e);
+          setSyncState("error");
+        });
+    } else if (convexUser) {
+      setSyncState("synced");
+    }
+  }, [isAuthLoaded, isSignedIn, clerkUser, convexUser, syncState, syncUserMutation]);
+
+
+  // 1. Fetch course details
+  const course = useQuery(api.courses.getBySlug, { slug: targetCourseQuery });
+
+  // 2. Locate batch
+  let targetBatch: any = null;
+  if (course && course.batches) {
+    if (requestedBatchId) {
+      targetBatch = course.batches.find((b: any) => b._id === requestedBatchId || (b as any).id === requestedBatchId);
+    }
+    if (!targetBatch && course.batches.length > 0) {
+      const upcomingWithCapacity = course.batches.find((b: any) => 
+        (b.capacity ?? 50) > (b.enrolledCount ?? 0) && (b.status === "upcoming" || b.status === "live")
+      );
+      targetBatch = upcomingWithCapacity || course.batches[0];
+    }
+  }
+
+  // 3. Existing Enrollment Guard Effect
+  useEffect(() => {
+    if (existingEnrollment && targetBatch) {
+      const bid = targetBatch._id || targetBatch.id;
+      router.push(`/dashboard/courses/${bid}/overview`);
+    }
+  }, [existingEnrollment, targetBatch, router]);
+
+  // STATE: AUTHENTICATING
+  if (!isAuthLoaded || !isSignedIn) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+          <h2 className="text-xl font-bold text-text-primary">Checking authentication...</h2>
+          <p className="text-sm text-text-secondary">Please wait while we verify your account.</p>
+        </div>
+      </main>
+    );
+  }
+
+  // STATE: SYNCING USER
+  if (syncState === "syncing" || (syncState === "idle" && convexUser === undefined)) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+          <h2 className="text-xl font-bold text-text-primary">Setting up your profile...</h2>
+          <p className="text-sm text-text-secondary">Initializing your student account for checkout.</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (syncState === "error") {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <ShieldCheck className="w-12 h-12 text-error mx-auto opacity-50" />
+          <h2 className="text-xl font-bold text-text-primary">Account Setup Failed</h2>
+          <p className="text-sm text-text-secondary">We could not initialize your profile for checkout. Please try logging out and back in.</p>
+          <Link href="/sign-up" className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
+            Return to Sign Up
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // STATE: LOADING COURSE & BATCH
+  if (course === undefined) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+          <h2 className="text-xl font-bold text-text-primary">Loading course details...</h2>
+        </div>
+      </main>
+    );
+  }
+
+  // STATE: COURSE NOT FOUND
+  if (course === null) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
@@ -35,20 +149,7 @@ export default async function CheckoutPage({
     );
   }
 
-  // 2. Locate or auto-select target batch
-  let targetBatch: any = null;
-  if (params.batchId) {
-    targetBatch = course.batches.find((b: any) => b._id === params.batchId || (b as any).id === params.batchId);
-  }
-
-  if (!targetBatch && course.batches.length > 0) {
-    // Select earliest valid upcoming batch with capacity
-    const upcomingWithCapacity = course.batches.find((b: any) => 
-      (b.capacity ?? 50) > (b.enrolledCount ?? 0) && (b.status === "upcoming" || b.status === "live")
-    );
-    targetBatch = upcomingWithCapacity || course.batches[0];
-  }
-
+  // STATE: BATCH NOT FOUND
   if (!targetBatch) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -64,53 +165,17 @@ export default async function CheckoutPage({
     );
   }
 
+  // STATE: READY
   const batchId = targetBatch._id || targetBatch.id;
-
-
-  if (!userId) {
-    // If not authenticated, redirect to sign-up and redirect back to this checkout URL
-    const checkoutUrl = `/checkout?courseSlug=${course.slug}&batchId=${batchId}`;
-    const redirectUrl = encodeURIComponent(checkoutUrl);
-    redirect(`/sign-up?redirect_url=${redirectUrl}`);
-  }
-
-  // 3. Fetch user details from database
-  const user = await fetchQuery(api.users.getUserByClerkId, { clerkId: userId }, { token }).catch(() => null);
-
-  // If user is authenticated in Clerk but not yet in Convex (webhook delay), wait.
-  if (!user) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-          <h2 className="text-xl font-bold text-text-primary">Preparing Checkout</h2>
-          <p className="text-sm text-text-secondary">Please wait a moment while we set up your account. This page will refresh automatically.</p>
-          <meta httpEquiv="refresh" content="2" />
-        </div>
-      </main>
-    );
-  }
-
-  // 4. Verify user is not already enrolled
-  const existingEnrollment = await fetchQuery(
-    api.student.getCourseDashboardContext,
-    { batchId: batchId as Id<"batches"> },
-    { token }
-  ).catch(() => null);
-
-  if (existingEnrollment) {
-    // Already enrolled, redirect directly to dashboard
-    redirect(`/dashboard/courses/${batchId}/overview`);
-  }
-
-  // Compute fees
   const subtotal = course.price;
-  const tax = Math.round(subtotal * 0.18); // 18% GST standard EdTech tax in India
-  const total = subtotal; // Price is inclusive of tax in our model
+  const tax = Math.round(subtotal * 0.18);
   const netAmount = subtotal - tax;
-  const batch = targetBatch;
   const courseSlug = course.slug;
 
+  const resolvedUser = convexUser || {
+    name: `${clerkUser?.firstName ?? ""} ${clerkUser?.lastName ?? ""}`.trim() || "Student",
+    email: clerkUser?.primaryEmailAddress?.emailAddress ?? ""
+  };
 
   return (
     <main className="min-h-screen bg-background py-16 px-4 md:px-8">
@@ -153,12 +218,12 @@ export default async function CheckoutPage({
               <div className="grid grid-cols-2 gap-4 text-left">
                 <div>
                   <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Cohort Batch</p>
-                  <p className="text-sm font-semibold text-text-primary mt-1">{batch.title}</p>
+                  <p className="text-sm font-semibold text-text-primary mt-1">{targetBatch.title}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Start Date</p>
                   <p className="text-sm font-semibold text-text-primary mt-1">
-                    {new Date(batch.startDate).toLocaleDateString("en-IN", {
+                    {new Date(targetBatch.startDate).toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
@@ -175,13 +240,13 @@ export default async function CheckoutPage({
                 <div>
                   <label className="text-[10px] font-bold text-text-muted uppercase">Full Name</label>
                   <div className="mt-1 text-sm font-medium text-text-primary p-3 bg-background/50 border border-border/40 rounded-xl">
-                    {user.name}
+                    {resolvedUser.name}
                   </div>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-text-muted uppercase">Email Address</label>
                   <div className="mt-1 text-sm font-medium text-text-primary p-3 bg-background/50 border border-border/40 rounded-xl truncate">
-                    {user.email}
+                    {resolvedUser.email}
                   </div>
                 </div>
               </div>
@@ -199,13 +264,28 @@ export default async function CheckoutPage({
               coursePrice={subtotal}
               taxAmount={tax}
               netAmount={netAmount}
-              studentName={user.name}
-              studentEmail={user.email}
+              studentName={resolvedUser.name}
+              studentEmail={resolvedUser.email}
             />
           </div>
         </div>
 
       </div>
     </main>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-8 bg-surface border border-border rounded-3xl space-y-4 text-center shadow-lg">
+          <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+          <h2 className="text-xl font-bold text-text-primary">Loading...</h2>
+        </div>
+      </main>
+    }>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }

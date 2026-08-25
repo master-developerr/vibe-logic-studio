@@ -291,9 +291,78 @@ function AddStudentModal({
 }
 
 /* ══════════════════════════════════════════════════════════
+   REMOVE STUDENTS MODAL
+══════════════════════════════════════════════════════════ */
+function RemoveStudentsModal({
+  open,
+  onClose,
+  selectedCount,
+  onConfirm,
+  submitting,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedCount: number;
+  onConfirm: () => void;
+  submitting: boolean;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            className="bg-surface rounded-2xl shadow-xl border border-border w-full max-w-sm overflow-hidden"
+          >
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-error/10 text-error flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h2 className="text-[17px] font-bold text-text-primary mb-2">Remove Students?</h2>
+              <p className="text-[13px] text-text-secondary leading-relaxed">
+                You are about to remove <span className="font-semibold text-text-primary">{selectedCount}</span> student{selectedCount !== 1 && "s"}. Their enrollments will be dropped and they will be archived from the directory. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 p-4 bg-background border-t border-border">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="flex-1 h-9 rounded-full text-[13px] font-semibold text-text-secondary hover:bg-surface border border-border transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={submitting}
+                className="flex-1 h-9 rounded-full bg-error text-white text-[13px] font-semibold hover:bg-error/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {submitting ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    ROW ACTION MENU
 ══════════════════════════════════════════════════════════ */
-function RowActions({ student, onView, onPromote, onMessage }: { student: StudentRow; onView: () => void; onPromote: () => void; onMessage: () => void; }) {
+function RowActions({ student, onView, onPromote, onMessage, onRemove }: { student: StudentRow; onView: () => void; onPromote: () => void; onMessage: () => void; onRemove: () => void; }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -323,7 +392,7 @@ function RowActions({ student, onView, onPromote, onMessage }: { student: Studen
                 { icon: Pencil,    label: "Edit Student",  action: () => setOpen(false) },
                 { icon: Award,     label: "Issue Certificate", action: () => setOpen(false) },
                 { icon: CreditCard, label: "Payment History", action: () => setOpen(false) },
-                { icon: Trash2,    label: "Remove",        action: () => setOpen(false), danger: true },
+                { icon: Trash2,    label: "Remove",        action: () => { onRemove(); setOpen(false); }, danger: true },
               ].map(({ icon: Icon, label, action, danger }) => (
                 <button
                   key={label}
@@ -402,6 +471,35 @@ export default function AdminStudentsPage() {
   const [messageStudent, setMessageStudent] = useState<StudentRow | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  
+  const removeStudents = useMutation(api.admin.removeStudents);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [studentsToRemove, setStudentsToRemove] = useState<Set<string>>(new Set());
+  const [removing, setRemoving] = useState(false);
+
+  const handleBulkRemoveClick = () => {
+    setStudentsToRemove(selectedIds);
+    setShowRemoveModal(true);
+  };
+
+  const handleSingleRemoveClick = (studentId: string) => {
+    setStudentsToRemove(new Set([studentId]));
+    setShowRemoveModal(true);
+  };
+
+  const handleConfirmRemove = async () => {
+    setRemoving(true);
+    try {
+      await removeStudents({ studentIds: Array.from(studentsToRemove) as Id<"users">[] });
+      setSelectedIds(new Set());
+      setShowRemoveModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove students");
+    } finally {
+      setRemoving(false);
+    }
+  };
 
   const isLoading = studentsRaw === undefined;
   const students: StudentRow[] = (studentsRaw ?? []) as StudentRow[];
@@ -673,7 +771,7 @@ export default function AdminStudentsPage() {
                 { icon: Send, label: "Announce" },
                 { icon: Award, label: "Certificates" },
                 { icon: Download, label: "Export", action: () => handleExport(students.filter(s => selectedIds.has(s.id))) },
-                { icon: Trash2, label: "Remove", danger: true },
+                { icon: Trash2, label: "Remove", danger: true, action: handleBulkRemoveClick },
               ].map(({ icon: Icon, label, danger, action }) => (
                 <button
                   key={label}
@@ -842,6 +940,7 @@ export default function AdminStudentsPage() {
                         onView={() => setDrawerStudent(student)}
                         onPromote={() => setPromoteStudent(student)}
                         onMessage={() => setMessageStudent(student)}
+                        onRemove={() => handleSingleRemoveClick(student.id)}
                       />
                     </td>
                   </motion.tr>
@@ -939,6 +1038,14 @@ export default function AdminStudentsPage() {
           studentName={messageStudent.name}
         />
       )}
+
+      <RemoveStudentsModal
+        open={showRemoveModal}
+        onClose={() => setShowRemoveModal(false)}
+        selectedCount={studentsToRemove.size}
+        onConfirm={handleConfirmRemove}
+        submitting={removing}
+      />
     </div>
   );
 }
