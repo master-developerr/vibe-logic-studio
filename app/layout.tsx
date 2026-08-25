@@ -14,17 +14,24 @@ export const metadata: Metadata = {
   keywords: ["AI development", "web development bootcamp", "React", "Next.js", "VibeLogic Studio"],
 };
 
+import { ClerkProvider } from "@clerk/nextjs";
+import { ConvexClientProvider } from "./ConvexClientProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${poppins.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
-    </html>
+    <ClerkProvider>
+      <html
+        lang="en"
+        className={`${poppins.variable} h-full antialiased`}
+      >
+        <body className="min-h-full flex flex-col font-sans">
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

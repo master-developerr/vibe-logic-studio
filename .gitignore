@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local development helper scripts and cache folders
+/fix.js
+/grant_admin.mjs
+/refactor.js
+/refactor.py
+/restore.js
+/memory.md
+.claude/
+.clerk/
+

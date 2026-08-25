@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vibe Logic Studio
 
-## Getting Started
+Vibe Logic Studio is an elite, high-performance EdTech SaaS platform designed to deliver a seamless, immersive, and premium learning experience.
 
-First, run the development server:
+---
 
+## Features
+
+* **Public Marketing & Course Catalog**: Breathtaking, SEO-optimized landing pages powered by a custom dynamic CMS.
+* **Frictionless Authentication**: Single Sign-On and User Profile Management handled securely by Clerk.
+* **Integrated Payments**: Frictionless INR checkout and automated student enrollment powered by Razorpay.
+* **Immersive Student Dashboard**: A real-time synchronized LMS workspace with announcement boards, class schedules, study materials, and interactive recording players.
+* **Operational Admin Panel**: Complete management console for batch allocation, scheduling, course catalogs, and student rosters.
+* **Real-time Synchronization**: Powered entirely by Convex backend database triggers.
+* **Analytics & Telemetry**: Full instrumentation with Sentry and PostHog.
+
+---
+
+## Tech Stack
+
+* **Frontend**: Next.js (App Router, React 19, TypeScript)
+* **Styling**: Vanilla CSS (Calibrated HSL palettes, smooth layout transitions, Framer Motion)
+* **Backend & Database**: Convex (Real-time BaaS, File Storage)
+* **Authentication**: Clerk
+* **Payments**: Razorpay
+* **Caching & Rate Limiting**: Upstash Redis
+* **Error Tracking**: Sentry
+* **User Analytics**: PostHog
+
+---
+
+## Setup Instructions
+
+### 1. Prerequisites
+Ensure you have the following installed:
+* **Node.js**: `v20.x` or later
+* **npm**: `v10.x` or later
+* **Go** (Optional, for running the local Razorpay MCP server): `v1.26+`
+
+### 2. Clone the Repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/master-developerr/vibe-logic-studio.git
+cd vibe-logic-studio
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Install Dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Configure Environment Variables
+Copy `.env.example` to create a local environment file:
+```bash
+cp .env.example .env.local
+```
+Open `.env.local` and configure your credentials (Clerk publishable/secret keys, Convex URL, Razorpay API credentials, Upstash Redis endpoints, and Sentry auth tokens).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Local Development
 
-To learn more about Next.js, take a look at the following resources:
+Vibe Logic Studio uses Convex as its serverless backend. Start the Convex development backend and the Next.js dev server in parallel:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Start the Convex backend sync (runs in terminal 1)**:
+   ```bash
+   npx convex dev
+   ```
+   *This command will deploy your schema, queries, and mutations to your Convex developer sandbox.*
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. **Start the Next.js development server (runs in terminal 2)**:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Quality & Verification
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To verify code quality and build compilation prior to staging or deployments, execute the following commands:
+
+* **Typecheck**: Validate TypeScript compilation
+  ```bash
+  npx tsc --noEmit
+  ```
+* **Lint**: Run ESLint checks
+  ```bash
+  npm run lint
+  ```
+* **Production Build**: Verify production compilation and static page optimization
+  ```bash
+  npm run build
+  ```
+
+---
+
+## Security
+
+Please review [`SECURITY.md`](SECURITY.md) for full details on:
+* Guidelines for secret management.
+* Protecting payment credentials and server-side boundaries.
+* Reporting vulnerabilities.
