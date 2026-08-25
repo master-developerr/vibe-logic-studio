@@ -3,9 +3,13 @@ import { NextRequest } from 'next/server';
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
 export async function POST(req: NextRequest) {
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!convexUrl) {
+    console.error("NEXT_PUBLIC_CONVEX_URL environment variable is missing on server");
+    return new Response("Database URL not configured", { status: 500 });
+  }
+  const convex = new ConvexHttpClient(convexUrl);
   let evt;
   try {
     evt = await verifyWebhook(req); // Automatically uses CLERK_WEBHOOK_SIGNING_SECRET
