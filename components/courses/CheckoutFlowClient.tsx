@@ -62,6 +62,8 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
     }
 
     if (convexUser === null) {
+      if (state === "ERROR") return; // Prevent infinite loop if ensureUser failed
+      
       setState("SYNCING_USER");
       
       // Proactively ensure user if missing

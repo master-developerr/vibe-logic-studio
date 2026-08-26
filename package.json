@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^4.13.23",
     "@clerk/nextjs": "^7.6.1",
     "@gsap/react": "^2.1.2",
     "@sentry/nextjs": "^10.68.0",

@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
   if (evt.type === 'user.created' || evt.type === 'user.updated') {
     const { email_addresses, first_name, last_name, image_url } = evt.data;
-    const email = email_addresses?.[0]?.email_address;
+    const email = email_addresses?.[0]?.email_address || "";
     const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() || "User";
     
     try {
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
         clerkId: id as string,
         email: email as string,
         name,
-        avatarUrl: image_url as string,
+        avatarUrl: (image_url as string) || "",
       });
     } catch (error) {
       console.error("Failed to sync user to Convex:", error);

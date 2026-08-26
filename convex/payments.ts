@@ -16,13 +16,26 @@ export const createPendingPayment = mutation({
       throw new Error("Unauthorized");
     }
 
-    const user = await ctx.db
+    let user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      // Fallback: create the user dynamically if the webhook or ensureUser hasn't finished
+      const newUserId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email ?? "",
+        name: identity.name ?? "User",
+        avatarUrl: identity.pictureUrl ?? "",
+        role: "student",
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(newUserId);
+      
+      if (!user) {
+        throw new Error("User not found and could not be created");
+      }
     }
 
     const course = await ctx.db.get(args.courseId);
@@ -71,13 +84,26 @@ export const fulfillEnrollment = internalMutation({
   },
   handler: async (ctx, args) => {
     // 1. Fetch user record
-    const user = await ctx.db
+    let user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      // Fallback: create the user dynamically if they don't exist
+      const newUserId = await ctx.db.insert("users", {
+        clerkId: args.clerkId,
+        email: "", // Webhooks and internal mutations might lack full context, fallback to empty
+        name: "User",
+        avatarUrl: "",
+        role: "student",
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(newUserId);
+      
+      if (!user) {
+        throw new Error("User not found and could not be created");
+      }
     }
 
     // 2. Locate or create the payment record
@@ -267,13 +293,26 @@ export const confirmPayment = mutation({
       throw new Error("Unauthorized");
     }
 
-    const user = await ctx.db
+    let user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
     if (!user) {
-      throw new Error("User not found");
+      // Fallback: create the user dynamically if they don't exist
+      const newUserId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email ?? "",
+        name: identity.name ?? "User",
+        avatarUrl: identity.pictureUrl ?? "",
+        role: "student",
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(newUserId);
+      
+      if (!user) {
+        throw new Error("User not found and could not be created");
+      }
     }
 
     const existingPayment = await ctx.db
