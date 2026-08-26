@@ -41,7 +41,7 @@ export default async function BatchWorkspaceLayout({
   const completedLessons = enrollment?.completedLessons?.length || 0;
 
   return (
-    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="w-full min-w-0 max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
       <StudentBatchWorkspaceHeader 
         batchId={batchId as Id<"batches">}
         courseTitle={course.title}

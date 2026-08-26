@@ -63,10 +63,10 @@ export default async function BatchOverviewPage({ params }: { params: Promise<{ 
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-sans pb-16">
+    <div className="grid min-w-0 grid-cols-1 lg:grid-cols-12 gap-8 font-sans pb-16">
       
       {/* LEFT / MAIN COLUMN (68%) */}
-      <div className="lg:col-span-8 space-y-6">
+      <div className="min-w-0 lg:col-span-8 space-y-6">
         
         {/* CONTINUE LEARNING CARD */}
         {totalLessons === 0 ? (
@@ -298,7 +298,7 @@ export default async function BatchOverviewPage({ params }: { params: Promise<{ 
       </div>
 
       {/* RIGHT / SIDEBAR COLUMN (32%) */}
-      <div className="lg:col-span-4 space-y-6">
+      <div className="min-w-0 lg:col-span-4 space-y-6">
         
         {/* UPCOMING CLASSES */}
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
