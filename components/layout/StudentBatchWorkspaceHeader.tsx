@@ -51,7 +51,7 @@ export function StudentBatchWorkspaceHeader({
   const isAnnouncementsPage = pathname.includes("/announcements");
 
   return (
-    <div className="bg-surface pt-4 md:pt-6 mb-6 w-full min-w-0">
+    <div className="bg-surface pt-4 md:pt-6 mb-6 w-full min-w-0 md:sticky md:top-[72px] md:z-40">
       <div className="w-full min-w-0">
         
         {/* Header Content Wrapper */}
@@ -136,7 +136,7 @@ export function StudentBatchWorkspaceHeader({
         </div>
 
         {/* Tabs */}
-        <div className="sticky top-[72px] z-20 flex min-w-0 items-center gap-8 overflow-x-auto overscroll-x-contain border-b border-border bg-surface h-[60px] touch-pan-x no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-border bg-surface min-h-[60px] py-3 md:flex-nowrap md:gap-8 md:overflow-x-auto md:overscroll-x-contain md:h-[60px] md:py-0 md:touch-pan-x [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border">
           {tabs.map((tab) => {
             const isActive = pathname.startsWith(tab.href);
             const Icon = tab.icon;
@@ -146,7 +146,7 @@ export function StudentBatchWorkspaceHeader({
                 key={tab.name}
                 href={tab.href}
                 className={`
-                  flex shrink-0 items-center gap-2.5 whitespace-nowrap transition-all text-[15px] font-semibold h-full border-b-2
+                  flex shrink-0 items-center gap-2.5 whitespace-nowrap transition-all text-[15px] font-semibold h-10 md:h-full border-b-2
                   ${isActive 
                     ? "border-primary text-primary" 
                     : "border-transparent text-text-secondary hover:text-text-primary"}
