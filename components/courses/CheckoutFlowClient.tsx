@@ -33,6 +33,7 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
   
   const [state, setState] = useState<CheckoutState>("INITIALIZING");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [hasAttemptedSync, setHasAttemptedSync] = useState(false);
 
   const ensureUser = useMutation(api.users.ensureMyUser);
 
@@ -62,9 +63,10 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
     }
 
     if (convexUser === null) {
-      if (state === "ERROR") return; // Prevent infinite loop if ensureUser failed
+      if (hasAttemptedSync) return; // Prevent infinite loop if ensureUser failed or is still processing
       
       setState("SYNCING_USER");
+      setHasAttemptedSync(true);
       
       // Proactively ensure user if missing
       ensureUser().catch((err) => {
@@ -92,7 +94,7 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
 
     setState("READY");
 
-  }, [clerkLoaded, userId, convexUser, checkoutStatus, ensureUser, router, batch.id]);
+  }, [clerkLoaded, userId, convexUser, checkoutStatus, ensureUser, router, batch.id, hasAttemptedSync]);
 
   if (state === "ERROR") {
     return (
