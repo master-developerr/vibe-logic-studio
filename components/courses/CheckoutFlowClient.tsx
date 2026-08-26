@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CheckoutClient } from "./CheckoutClient";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type CheckoutFlowClientProps = {
@@ -24,68 +24,104 @@ type CheckoutFlowClientProps = {
   };
 };
 
+type CheckoutState = "INITIALIZING" | "AUTHENTICATING" | "SYNCING_USER" | "CHECKING_PAYMENT" | "READY" | "ERROR";
+
 export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
   const { isLoaded: clerkLoaded, userId } = useAuth();
   const { user: clerkUser } = useUser();
   const router = useRouter();
   
+  const [state, setState] = useState<CheckoutState>("INITIALIZING");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
   const ensureUser = useMutation(api.users.ensureMyUser);
 
-  // Poll Convex for the user record (reactive)
   const convexUser = useQuery(
     api.users.getUserByClerkId,
     userId ? { clerkId: userId } : "skip"
   );
 
-  // Poll Convex for the checkout status (reactive, only when user exists)
   const checkoutStatus = useQuery(
     api.payments.getCheckoutStatus,
     userId && convexUser ? { courseId: course.id, batchId: batch.id } : "skip"
   );
 
   useEffect(() => {
-    // If Clerk is loaded and we have a userId, but convexUser is null
-    // it means the webhook hasn't processed or failed. Fallback to server-side creation.
-    if (clerkLoaded && userId && convexUser === null) {
-      ensureUser().catch(console.error);
+    if (!clerkLoaded) {
+      setState("INITIALIZING");
+      return;
     }
-  }, [clerkLoaded, userId, convexUser, ensureUser]);
-  
-  // Handle redirect if paid
-  useEffect(() => {
+    if (!userId) {
+      setState("AUTHENTICATING");
+      return;
+    }
+
+    if (convexUser === undefined) {
+      setState("SYNCING_USER");
+      return;
+    }
+
+    if (convexUser === null) {
+      setState("SYNCING_USER");
+      
+      // Proactively ensure user if missing
+      ensureUser().catch((err) => {
+        console.error("Failed to ensure Convex user:", err);
+        setErrorMessage(
+          err.message.includes("Unauthenticated") 
+            ? "Authentication configuration error. Please verify your Clerk Domain in Convex (auth.config.ts) matches the production environment."
+            : err.message
+        );
+        setState("ERROR");
+      });
+      return;
+    }
+
+    if (checkoutStatus === undefined) {
+      setState("CHECKING_PAYMENT");
+      return;
+    }
+
+    // Process checkoutStatus
     if (checkoutStatus?.hasSuccessfulPayment || checkoutStatus?.hasActiveEnrollment) {
       router.push(`/dashboard/courses/${checkoutStatus.batchId || batch.id}/overview`);
+      return;
     }
-  }, [checkoutStatus, router, batch.id]);
 
-  if (!clerkLoaded) {
+    setState("READY");
+
+  }, [clerkLoaded, userId, convexUser, checkoutStatus, ensureUser, router, batch.id]);
+
+  if (state === "ERROR") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <AlertCircle className="w-12 h-12 text-error" />
+        <p className="text-error font-medium text-center max-w-md">
+          {errorMessage || "An unexpected error occurred while setting up your account."}
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-surface border border-border rounded-lg text-sm font-medium hover:bg-surface/80"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (state === "INITIALIZING" || state === "AUTHENTICATING") {
     return <LoadingState text="Signing you in..." />;
   }
 
-  if (!userId) {
-    // This shouldn't happen because page.tsx redirects unauth users, but just in case
-    return <LoadingState text="Redirecting to sign in..." />;
+  if (state === "SYNCING_USER") {
+    return <LoadingState text="Setting up your account in the database..." />;
   }
 
-  if (convexUser === undefined) {
-    return <LoadingState text="Checking account..." />;
+  if (state === "CHECKING_PAYMENT") {
+    return <LoadingState text="Checking your enrollment status..." />;
   }
 
-  if (convexUser === null) {
-    return <LoadingState text="Setting up your account..." />;
-  }
-
-  if (checkoutStatus === undefined) {
-    return <LoadingState text="Checking your enrollment..." />;
-  }
-
-  const hasPaid = checkoutStatus?.hasSuccessfulPayment || checkoutStatus?.hasActiveEnrollment;
-
-  if (hasPaid) {
-    return <LoadingState text="Redirecting to your course..." />;
-  }
-
-  // Ready for checkout
+  // READY state below
   const subtotal = course.price;
   const tax = Math.round(subtotal * 0.18);
   const netAmount = subtotal - tax;
@@ -135,13 +171,13 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
             <div>
               <label className="text-[10px] font-bold text-text-muted uppercase">Full Name</label>
               <div className="mt-1 text-sm font-medium text-text-primary p-3 bg-background/50 border border-border/40 rounded-xl">
-                {convexUser.name || `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() || "Student"}
+                {convexUser?.name || `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() || "Student"}
               </div>
             </div>
             <div>
               <label className="text-[10px] font-bold text-text-muted uppercase">Email Address</label>
               <div className="mt-1 text-sm font-medium text-text-primary p-3 bg-background/50 border border-border/40 rounded-xl truncate">
-                {convexUser.email || clerkUser?.emailAddresses[0]?.emailAddress || ""}
+                {convexUser?.email || clerkUser?.emailAddresses[0]?.emailAddress || ""}
               </div>
             </div>
           </div>
@@ -159,8 +195,8 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
           coursePrice={subtotal}
           taxAmount={tax}
           netAmount={netAmount}
-          studentName={convexUser.name || `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() || "Student"}
-          studentEmail={convexUser.email || clerkUser?.emailAddresses[0]?.emailAddress || ""}
+          studentName={convexUser?.name || `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim() || "Student"}
+          studentEmail={convexUser?.email || clerkUser?.emailAddresses[0]?.emailAddress || ""}
         />
       </div>
     </div>
