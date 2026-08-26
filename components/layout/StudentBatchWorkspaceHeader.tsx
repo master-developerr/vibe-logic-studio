@@ -51,7 +51,7 @@ export function StudentBatchWorkspaceHeader({
   const isAnnouncementsPage = pathname.includes("/announcements");
 
   return (
-    <div className="bg-surface pt-4 md:pt-6 mb-6 w-full min-w-0 md:sticky md:top-[72px] md:z-40">
+    <div className="bg-surface pt-4 md:pt-6 mb-6 w-full min-w-0 sticky top-[72px] z-40">
       <div className="w-full min-w-0">
         
         {/* Header Content Wrapper */}

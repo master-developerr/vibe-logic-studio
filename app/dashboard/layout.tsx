@@ -31,7 +31,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-w-0 flex-col min-h-screen overflow-x-hidden bg-[#FBFBFB] text-gray-900">
+    <div className="flex min-w-0 flex-col min-h-screen overflow-x-clip bg-[#FBFBFB] text-gray-900">
       <StudentNavbar user={user} />
       <main className="flex-1 min-w-0 w-full max-w-7xl mx-auto px-6 lg:px-12 py-10">
         {children}
