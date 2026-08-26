@@ -59,3 +59,34 @@ export const getUserByClerkId = query({
     return user;
   },
 });
+
+export const ensureMyUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated call to ensureMyUser");
+    }
+
+    const clerkId = identity.subject;
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
+      .unique();
+
+    if (existing) {
+      return existing._id;
+    }
+
+    const newUserId = await ctx.db.insert("users", {
+      clerkId,
+      email: identity.email ?? "",
+      name: identity.name ?? "User",
+      avatarUrl: identity.pictureUrl ?? "",
+      role: "student",
+      createdAt: Date.now(),
+    });
+
+    return newUserId;
+  },
+});

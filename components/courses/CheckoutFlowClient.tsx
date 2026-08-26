@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CheckoutClient } from "./CheckoutClient";
@@ -29,7 +29,7 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
   const { user: clerkUser } = useUser();
   const router = useRouter();
   
-  const [syncTimeout, setSyncTimeout] = useState(false);
+  const ensureUser = useMutation(api.users.ensureMyUser);
 
   // Poll Convex for the user record (reactive)
   const convexUser = useQuery(
@@ -44,13 +44,12 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
   );
 
   useEffect(() => {
-    // If Clerk is loaded and we have a userId, start a 15s timeout
-    // If the convexUser is still null after 15s, show an error.
+    // If Clerk is loaded and we have a userId, but convexUser is null
+    // it means the webhook hasn't processed or failed. Fallback to server-side creation.
     if (clerkLoaded && userId && convexUser === null) {
-      const timer = setTimeout(() => setSyncTimeout(true), 15000);
-      return () => clearTimeout(timer);
+      ensureUser().catch(console.error);
     }
-  }, [clerkLoaded, userId, convexUser]);
+  }, [clerkLoaded, userId, convexUser, ensureUser]);
   
   // Handle redirect if paid
   useEffect(() => {
@@ -73,19 +72,6 @@ export function CheckoutFlowClient({ course, batch }: CheckoutFlowClientProps) {
   }
 
   if (convexUser === null) {
-    if (syncTimeout) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-          <p className="text-error font-medium">Your account is still being set up. Please try again.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-surface border border-border rounded-lg text-sm"
-          >
-            Refresh
-          </button>
-        </div>
-      );
-    }
     return <LoadingState text="Setting up your account..." />;
   }
 
