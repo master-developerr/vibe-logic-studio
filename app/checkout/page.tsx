@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { CheckoutFlowClient } from "@/components/courses/CheckoutFlowClient";
 import Link from "next/link";
 import { ChevronLeft, ShieldCheck } from "lucide-react";
@@ -22,15 +23,14 @@ export default async function CheckoutPage({
   }
 
   // 2. Locate or auto-select target batch
-  let targetBatch: any = null;
-  if (params.batchId) {
-    targetBatch = course.batches.find((b: any) => b._id === params.batchId || (b as any).id === params.batchId);
-  }
+  let targetBatch = params.batchId
+    ? course.batches.find((candidate) => candidate._id === params.batchId)
+    : undefined;
 
   if (!targetBatch && course.batches.length > 0) {
     // Select earliest valid upcoming batch with capacity
-    const upcomingWithCapacity = course.batches.find((b: any) => 
-      (b.capacity ?? 50) > (b.enrolledCount ?? 0) && (b.status === "upcoming" || b.status === "live")
+    const upcomingWithCapacity = course.batches.find((candidate) =>
+      candidate.capacity > candidate.enrolledCount && (candidate.status === "upcoming" || candidate.status === "live")
     );
     targetBatch = upcomingWithCapacity || course.batches[0];
   }
@@ -39,7 +39,19 @@ export default async function CheckoutPage({
     redirect(course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint" ? "/build-software-with-ai" : "/");
   }
 
-  const batchId = targetBatch._id || targetBatch.id;
+  const batchId = targetBatch._id;
+  const checkoutCourse = {
+    id: course.id as Id<"courses">,
+    slug: course.slug,
+    category: course.category,
+    title: course.title,
+    price: course.price,
+  };
+  const checkoutBatch = {
+    id: batchId as Id<"batches">,
+    title: targetBatch.title,
+    startDate: targetBatch.startDate,
+  };
 
   if (!userId) {
     // If not authenticated, redirect to sign-up and redirect back to this checkout URL
@@ -67,8 +79,8 @@ export default async function CheckoutPage({
         </div>
 
         <CheckoutFlowClient 
-          course={course as any} 
-          batch={targetBatch as any} 
+          course={checkoutCourse}
+          batch={checkoutBatch}
         />
 
       </div>

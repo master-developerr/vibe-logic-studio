@@ -2,17 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import Razorpay from "razorpay";
 import { fetchQuery, fetchMutation } from "convex/nextjs";
-import { api, internal } from "@/convex/_generated/api";
+import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+
+type CheckoutOrderRequest = {
+  courseSlug?: string;
+  courseId?: string;
+  batchId?: string;
+};
+
+function isCheckoutOrderRequest(value: unknown): value is CheckoutOrderRequest {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return ["courseSlug", "courseId", "batchId"].every((key) =>
+    record[key] === undefined || typeof record[key] === "string"
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Failed to create checkout order";
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId } = await auth();
+    const { userId: clerkId, getToken } = await auth();
     if (!clerkId) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const body = await req.json();
+    const body: unknown = await req.json();
+    if (!isCheckoutOrderRequest(body)) {
+      return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
+    }
+
     const { courseSlug, courseId, batchId: requestedBatchId } = body;
     const targetSlug = courseSlug || courseId || "build-software-with-ai";
 
@@ -24,14 +46,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Find the batch in course batches, or select earliest upcoming with capacity
-    let batch: any = null;
-    if (requestedBatchId) {
-      batch = course.batches?.find((b: any) => b._id === requestedBatchId || (b as any).id === requestedBatchId);
-    }
+    let batch = requestedBatchId
+      ? course.batches.find((candidate) => candidate._id === requestedBatchId)
+      : undefined;
 
-    if (!batch && course.batches && course.batches.length > 0) {
-      const upcomingWithCapacity = course.batches.find((b: any) => 
-        (b.capacity ?? 50) > (b.enrolledCount ?? 0) && (b.status === "upcoming" || b.status === "live")
+    if (!batch && course.batches.length > 0) {
+      const upcomingWithCapacity = course.batches.find((candidate) =>
+        candidate.capacity > candidate.enrolledCount && (candidate.status === "upcoming" || candidate.status === "live")
       );
       batch = upcomingWithCapacity || course.batches[0];
     }
@@ -40,12 +61,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No active batches found for this program" }, { status: 404 });
     }
 
-    const batchId = batch._id || batch.id;
+    const batchId = batch._id;
 
 
     // Verify seats
-    const enrolledCount = batch.enrolledCount ?? 0;
-    const capacity = batch.capacity ?? 50;
+    const enrolledCount = batch.enrolledCount;
+    const capacity = batch.capacity;
     if (enrolledCount >= capacity) {
       return NextResponse.json({ error: "Batch is full" }, { status: 400 });
     }
@@ -72,18 +93,19 @@ export async function POST(req: NextRequest) {
       receipt: `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       notes: {
         clerkId,
-        courseId: course.id, // use the internal DB ID from the course object
-        batchId,
+        courseId: course.id.toString(),
+        batchId: batchId.toString(),
       },
     });
 
-    const token = await (await auth()).getToken({ template: "convex" }) ?? undefined;
+    const token = (await getToken({ template: "convex" })) ?? undefined;
 
     // 3. Create pending payment record in Convex
     await fetchMutation(api.payments.createPendingPayment, {
       razorpayOrderId: order.id,
       amount: course.price,
       courseId: course.id as Id<"courses">,
+      batchId,
     }, { token });
 
     return NextResponse.json({
@@ -94,8 +116,8 @@ export async function POST(req: NextRequest) {
       courseTitle: course.title,
       price: course.price,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Checkout order API error:", error);
-    return NextResponse.json({ error: error.message || "Failed to create checkout order" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

@@ -108,7 +108,8 @@ export default defineSchema({
     completedLessons: v.optional(v.array(v.id("studyMaterials"))),
   }).index("by_user_id", ["userId"])
     .index("by_course_id", ["courseId"])
-    .index("by_batch_id", ["batchId"]),
+    .index("by_batch_id", ["batchId"])
+    .index("by_user_course_batch", ["userId", "courseId", "batchId"]),
 
   payments: defineTable({
     userId: v.id("users"),
@@ -124,6 +125,9 @@ export default defineSchema({
     customerEmail: v.optional(v.string()),
     courseTitle: v.optional(v.string()),
     courseId: v.optional(v.id("courses")),
+    // Optional during the zero-downtime migration. All new checkout mutations
+    // write a batch ID, while historical records remain readable.
+    batchId: v.optional(v.id("batches")),
     invoiceNumber: v.optional(v.string()), // e.g. "INV-2026-0842"
     invoiceUrl: v.optional(v.string()),
     taxAmount: v.optional(v.number()), // e.g. GST / VAT
@@ -140,7 +144,8 @@ export default defineSchema({
     errorCode: v.optional(v.string()), // "ERR_INSUFFICIENT_FUNDS" | "CARD_EXPIRED" | "GATEWAY_TIMEOUT"
     errorMessage: v.optional(v.string()),
     payoutStatus: v.optional(v.string()), // "Pending" | "Settled" | "In Transit"
-  }).index("by_user_id", ["userId"]),
+  }).index("by_user_id", ["userId"])
+    .index("by_user_course_batch", ["userId", "courseId", "batchId"]),
 
   reviews: defineTable({
     userId: v.id("users"),

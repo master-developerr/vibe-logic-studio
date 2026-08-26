@@ -5,6 +5,26 @@ import { api } from "@/convex/_generated/api";
 import { verifyRazorpayPaymentSignature } from "@/lib/razorpay";
 import { Id } from "@/convex/_generated/dataModel";
 
+type CheckoutVerificationRequest = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  courseSlug: string;
+  batchId: string;
+};
+
+function isCheckoutVerificationRequest(value: unknown): value is CheckoutVerificationRequest {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return ["razorpay_order_id", "razorpay_payment_id", "razorpay_signature", "courseSlug", "batchId"].every(
+    (key) => typeof record[key] === "string" && record[key].length > 0
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Failed to verify checkout";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId: clerkId, getToken } = await auth();
@@ -12,18 +32,18 @@ export async function POST(req: NextRequest) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const body = await req.json();
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseSlug, batchId } = body;
-
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !courseSlug || !batchId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const body: unknown = await req.json();
+    if (!isCheckoutVerificationRequest(body)) {
+      return NextResponse.json({ error: "Missing or invalid required fields" }, { status: 400 });
     }
+
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseSlug, batchId } = body;
 
     const course = await fetchQuery(api.courses.getBySlug, { slug: courseSlug });
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
-    const courseId = (course as any)._id || (course as any).id;
+    const courseId = course.id;
 
     const secret = process.env.RAZORPAY_KEY_SECRET;
     if (!secret) {
@@ -54,8 +74,8 @@ export async function POST(req: NextRequest) {
     }, { token });
 
     return NextResponse.json({ success: true, result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Checkout verify API error:", error);
-    return NextResponse.json({ error: error.message || "Failed to verify checkout" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

@@ -229,8 +229,10 @@ function CheckoutFlowInner({ course, batch }: CheckoutFlowClientProps) {
   const [state, setState] = useState<CheckoutState>("INITIALIZING");
   const [diagnosticError, setDiagnosticError] = useState<DiagnosticInfo | null>(null);
   const [hasAttemptedSync, setHasAttemptedSync] = useState(false);
+  const [hasAttemptedReconciliation, setHasAttemptedReconciliation] = useState(false);
 
   const ensureUser = useMutation(api.users.ensureMyUser);
+  const reconcileEnrollment = useMutation(api.payments.reconcileEnrollment);
 
   const convexUser = useQuery(
     api.users.getUserByClerkId,
@@ -309,14 +311,53 @@ function CheckoutFlowInner({ course, batch }: CheckoutFlowClientProps) {
       return;
     }
 
-    // Already paid or enrolled → redirect to batch dashboard
-    if (checkoutStatus?.hasSuccessfulPayment || checkoutStatus?.hasActiveEnrollment) {
-      router.push(`/dashboard/courses/${checkoutStatus.batchId || batch.id}/overview`);
+    // An active enrollment is authoritative and determines the destination batch.
+    if (checkoutStatus?.hasActiveEnrollment) {
+      router.replace(`/dashboard/courses/${checkoutStatus.batchId || batch.id}/overview`);
+      return;
+    }
+
+    // A verified payment without an enrollment is repaired before access is granted.
+    if (checkoutStatus?.hasSuccessfulPayment) {
+      if (hasAttemptedReconciliation) return;
+
+      const resolvedBatchId = checkoutStatus.batchId || batch.id;
+      setState("CHECKING_PAYMENT");
+      setHasAttemptedReconciliation(true);
+      reconcileEnrollment({ courseId: course.id, batchId: resolvedBatchId })
+        .then(({ batchId }) => {
+          router.replace(`/dashboard/courses/${batchId}/overview`);
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : "Unable to restore your enrollment";
+          setDiagnosticError({
+            stage: "Enrollment reconciliation",
+            operation: "payments:reconcileEnrollment",
+            error: message,
+            hints: [
+              "A verified payment was found, but the matching enrollment could not be restored.",
+              "No new payment was started. Please try again or contact support.",
+            ],
+          });
+          setState("ERROR");
+        });
       return;
     }
 
     setState("READY");
-  }, [clerkLoaded, userId, convexUser, checkoutStatus, ensureUser, router, batch.id, hasAttemptedSync]);
+  }, [
+    clerkLoaded,
+    userId,
+    convexUser,
+    checkoutStatus,
+    ensureUser,
+    reconcileEnrollment,
+    router,
+    course.id,
+    batch.id,
+    hasAttemptedSync,
+    hasAttemptedReconciliation,
+  ]);
 
   // ── Render states ──
 
