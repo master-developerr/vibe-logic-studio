@@ -23,12 +23,18 @@ export function BatchSettingsResourcesHub({
   resources,
 }: BatchSettingsResourcesHubProps) {
   const router = useRouter();
+  const safeResources = resources || {
+    studyMaterialsCount: 0,
+    recordingsCount: 0,
+    announcementsCount: 0,
+    enrolledStudentsCount: 0,
+  };
 
   const cards = [
     {
       title: "Study Materials & Curriculum",
       desc: "Managed PDFs, cheat sheets, code archives, and companion workbooks.",
-      count: `${resources.studyMaterialsCount} files loaded`,
+      count: `${safeResources.studyMaterialsCount} files loaded`,
       icon: FileText,
       iconBg: "bg-orange-100 text-orange-700",
       path: `/admin/batches/${batchId}/materials`,
@@ -37,7 +43,7 @@ export function BatchSettingsResourcesHub({
     {
       title: "Class Video Recordings",
       desc: "HD cloud session recordings, YouTube embeds, and replay analytics.",
-      count: `${resources.recordingsCount} videos recorded`,
+      count: `${safeResources.recordingsCount} videos recorded`,
       icon: Video,
       iconBg: "bg-blue-100 text-blue-700",
       path: `/admin/batches/${batchId}/recordings`,
@@ -46,7 +52,7 @@ export function BatchSettingsResourcesHub({
     {
       title: "Student Announcements",
       desc: "Targeted cohort broadcasts, pinned notices, and alert logs.",
-      count: `${resources.announcementsCount} live announcements`,
+      count: `${safeResources.announcementsCount} live announcements`,
       icon: Megaphone,
       iconBg: "bg-purple-100 text-purple-700",
       path: `/admin/batches/${batchId}/announcements`,

@@ -230,7 +230,7 @@ export default function BatchSettingsPage() {
     );
   }
 
-  if (queryData === null) {
+  if (!queryData || !queryData.settings) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
         <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 font-bold">

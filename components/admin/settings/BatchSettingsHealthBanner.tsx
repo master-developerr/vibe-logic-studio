@@ -20,10 +20,15 @@ interface BatchSettingsHealthBannerProps {
 }
 
 export function BatchSettingsHealthBanner({
-  enrolledCount,
-  capacity,
+  enrolledCount = 0,
+  capacity = 50,
   health,
 }: BatchSettingsHealthBannerProps) {
+  const safeHealth = health || { completenessScore: 0, alerts: [], auditLog: [] };
+  const safeAlerts = safeHealth.alerts || [];
+  const safeAuditLog = safeHealth.auditLog || [];
+  const completenessScore = safeHealth.completenessScore || 0;
+
   const capacityPercent =
     capacity > 0 ? Math.min(100, Math.round((enrolledCount / capacity) * 100)) : 0;
   const isNearFull = capacityPercent >= 85;
@@ -41,12 +46,12 @@ export function BatchSettingsHealthBanner({
             </span>
             <span
               className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                health.completenessScore >= 80
+                completenessScore >= 80
                   ? "bg-emerald-100 text-emerald-800"
                   : "bg-amber-100 text-amber-800"
               }`}
             >
-              {health.completenessScore}% Complete
+              {completenessScore}% Complete
             </span>
           </div>
 
@@ -54,21 +59,21 @@ export function BatchSettingsHealthBanner({
           <div className="w-full bg-border rounded-full h-2 overflow-hidden mb-4">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
-                health.completenessScore >= 80 ? "bg-emerald-500" : "bg-primary"
+                completenessScore >= 80 ? "bg-emerald-500" : "bg-primary"
               }`}
-              style={{ width: `${health.completenessScore}%` }}
+              style={{ width: `${completenessScore}%` }}
             />
           </div>
 
           {/* Alerts Feed */}
           <div className="space-y-2">
-            {health.alerts.length === 0 ? (
+            {safeAlerts.length === 0 ? (
               <div className="flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                 <span>All core cohort links & settings are fully configured.</span>
               </div>
             ) : (
-              health.alerts.slice(0, 2).map((alert, idx) => {
+              safeAlerts.slice(0, 2).map((alert, idx) => {
                 const isWarn = alert.type === "warning";
                 const isErr = alert.type === "error";
                 return (
@@ -177,7 +182,10 @@ export function BatchSettingsHealthBanner({
           </div>
 
           <div className="space-y-3">
-            {health.auditLog.map((log) => (
+            {safeAuditLog.length === 0 ? (
+              <p className="text-xs text-text-muted italic py-2">No recent audit log entries.</p>
+            ) : (
+              safeAuditLog.map((log) => (
               <div
                 key={log.id}
                 className="flex items-start justify-between gap-2 text-xs border-b border-border/60 pb-2 last:border-0 last:pb-0"
@@ -194,7 +202,7 @@ export function BatchSettingsHealthBanner({
                   {log.timeAgo}
                 </span>
               </div>
-            ))}
+            )))}
           </div>
         </div>
 
