@@ -33,6 +33,15 @@ export function RecordingPlayerClient({ batchId, recordingId, clerkId }: Recordi
   });
 
   const updateProgress = useMutation(api.student.updateRecordingProgress);
+  const markAttendance = useMutation(api.student.markSessionAttendance);
+
+  useEffect(() => {
+    if (!recording) return;
+    markAttendance({
+      sessionId: recording._id as Id<"liveClasses">,
+      attendanceSource: "recording_watch",
+    }).catch(() => {});
+  }, [recording?._id]);
 
   const isLoading = recordings === undefined;
 

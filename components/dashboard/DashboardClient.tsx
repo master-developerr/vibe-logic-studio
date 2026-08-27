@@ -13,6 +13,7 @@ import {
   BookOpen,
   Link as LinkIcon
 } from "lucide-react";
+import { JoinClassButton } from "./JoinClassButton";
 
 export function DashboardClient({ 
   user, 
@@ -267,9 +268,11 @@ export function DashboardClient({
                       </div>
                       
                       {cls.meetingLink ? (
-                        <a href={cls.meetingLink} target="_blank" rel="noreferrer" className="shrink-0 text-[#FF5722] hover:bg-orange-50 p-2 rounded-full transition-colors">
-                          <Video className="w-5 h-5" />
-                        </a>
+                        <JoinClassButton
+                          sessionId={cls._id}
+                          meetingLink={cls.meetingLink}
+                          variant="icon"
+                        />
                       ) : (
                         <div className="shrink-0 text-gray-300 p-2">
                           <LinkIcon className="w-5 h-5" />

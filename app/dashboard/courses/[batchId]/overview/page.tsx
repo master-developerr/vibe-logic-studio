@@ -7,6 +7,7 @@ import {
   ClipboardList, BookOpen, Clock, ChevronRight, CheckCircle2, 
   Activity, FolderOpen, AlertCircle, ArrowRight, FileText
 } from "lucide-react";
+import { JoinClassButton } from "@/components/dashboard/JoinClassButton";
 
 export default async function BatchOverviewPage({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
@@ -333,14 +334,13 @@ export default async function BatchOverviewPage({ params }: { params: Promise<{ 
                   </div>
                 </div>
                 
-                <a 
-                  href={cls.meetingLink} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center w-full py-3 mt-4 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
+                <JoinClassButton
+                  sessionId={cls._id}
+                  meetingLink={cls.meetingLink}
+                  className="flex items-center justify-center w-full py-3 mt-4 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
                 >
                   Join Class →
-                </a>
+                </JoinClassButton>
               </div>
             ))}
             

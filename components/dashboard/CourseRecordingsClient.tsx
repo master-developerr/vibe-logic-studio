@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { extractYouTubeVideoId } from "@/lib/youtube";
+import { WatchRecordingButton } from "./WatchRecordingButton";
 
 interface CourseRecordingsClientProps {
   batchId: Id<"batches">;
@@ -360,8 +361,9 @@ export function CourseRecordingsClient({ batchId, clerkId }: CourseRecordingsCli
 
                 {/* ACTION */}
                 <div className="shrink-0 flex items-center md:justify-end md:w-[150px] w-full pt-2 md:pt-0">
-                  <Link
-                    href={`/dashboard/courses/${batchId}/recordings/${rec._id}`}
+                  <WatchRecordingButton
+                    sessionId={rec._id}
+                    batchId={batchId}
                     className={`flex items-center justify-center gap-2 w-full px-5 py-2.5 rounded-[10px] text-[13px] font-bold transition-all active:scale-95 ${
                       pStatus === "Completed" 
                         ? "bg-surface text-text-secondary hover:text-text-primary border border-border hover:bg-gray-50" 
@@ -384,7 +386,7 @@ export function CourseRecordingsClient({ batchId, clerkId }: CourseRecordingsCli
                         Watch <span className="text-[16px] leading-none ml-0.5">→</span>
                       </>
                     )}
-                  </Link>
+                  </WatchRecordingButton>
                 </div>
               </div>
             );

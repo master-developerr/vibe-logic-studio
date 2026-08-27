@@ -529,3 +529,170 @@ export const markAnnouncementRead = mutation({
     }
   },
 });
+
+export const markSessionAttendance = mutation({
+  args: {
+    sessionId: v.id("liveClasses"),
+    attendanceSource: v.string(), // "live_join" | "recording_watch"
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated caller");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) {
+      throw new Error("User record not found");
+    }
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    if (session.status === "Cancelled") {
+      return {
+        success: false,
+        attendanceId: undefined,
+        alreadyExisted: false,
+        status: undefined,
+        reason: "Session is cancelled",
+      };
+    }
+
+    // Verify enrollment for students
+    const isStaffOrAdmin =
+      user.role === "admin" ||
+      user.role === "superadmin" ||
+      user.role === "instructor" ||
+      user.role === "staff";
+
+    if (!isStaffOrAdmin) {
+      const userEnrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+        .collect();
+
+      const enrollment = userEnrollments.find(
+        (e) => e.batchId === session.batchId && e.status === "active"
+      );
+
+      if (!enrollment) {
+        throw new Error("Student is not enrolled in this batch");
+      }
+    }
+
+    // Idempotent check: query index by_user_live_class
+    const existing = await ctx.db
+      .query("attendance")
+      .withIndex("by_user_live_class", (q) =>
+        q.eq("userId", user._id).eq("liveClassId", args.sessionId)
+      )
+      .first();
+
+    const source = args.attendanceSource === "recording_watch" ? "recording_watch" : "live_join";
+
+    if (existing) {
+      return {
+        success: true,
+        attendanceId: existing._id,
+        alreadyExisted: true,
+        status: existing.status,
+        reason: undefined,
+      };
+    }
+
+    // Insert new attendance record
+    const attendanceId = await ctx.db.insert("attendance", {
+      userId: user._id,
+      batchId: session.batchId,
+      liveClassId: args.sessionId,
+      status: "Present",
+      attendanceSource: source,
+      markedAt: Date.now(),
+    });
+
+    // Log student activity
+    const batch = await ctx.db.get(session.batchId);
+    if (batch) {
+      await ctx.db.insert("activities", {
+        userId: user._id,
+        courseId: batch.courseId,
+        batchId: session.batchId,
+        type: source === "recording_watch" ? "Recording Watched" : "Live Class Attended",
+        title: source === "recording_watch"
+          ? `Watched recording: ${session.title}`
+          : `Attended live class: ${session.title}`,
+        timestamp: Date.now(),
+        resourceId: session._id,
+      });
+    }
+
+    // Recalculate student attendance percentage for batch
+    const allBatchClasses = await ctx.db
+      .query("liveClasses")
+      .withIndex("by_batch_id", (q) => q.eq("batchId", session.batchId))
+      .collect();
+
+    const publishedClasses = allBatchClasses.filter((c) => c.status !== "Draft");
+
+    const userAttendances = await ctx.db
+      .query("attendance")
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const validStatuses = ["Present", "Late", "Excused"];
+    const presentCount = userAttendances.filter(
+      (a) => a.batchId === session.batchId && validStatuses.includes(a.status)
+    ).length;
+
+    const totalCount = Math.max(1, publishedClasses.length);
+    const newPct = Math.min(100, Math.round((presentCount / totalCount) * 100));
+
+    const userEnrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const activeEnrollment = userEnrollments.find(
+      (e) => e.batchId === session.batchId
+    );
+
+    if (activeEnrollment) {
+      await ctx.db.patch(activeEnrollment._id, { attendancePercentage: newPct });
+    }
+
+    return {
+      success: true,
+      attendanceId: attendanceId as string,
+      alreadyExisted: false,
+      status: "Present",
+      reason: undefined,
+    };
+  },
+});
+
+export const getStudentAttendanceForSession = query({
+  args: { sessionId: v.id("liveClasses") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return null;
+
+    return await ctx.db
+      .query("attendance")
+      .withIndex("by_user_live_class", (q) =>
+        q.eq("userId", user._id).eq("liveClassId", args.sessionId)
+      )
+      .first();
+  },
+});

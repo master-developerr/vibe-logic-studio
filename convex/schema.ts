@@ -338,4 +338,17 @@ export default defineSchema({
   }).index("by_user", ["userId"])
     .index("by_announcement", ["announcementId"])
     .index("by_user_announcement", ["userId", "announcementId"]),
+
+  attendance: defineTable({
+    userId: v.id("users"),
+    batchId: v.id("batches"),
+    liveClassId: v.id("liveClasses"),
+    status: v.string(), // "Present" | "Absent" | "Late" | "Excused"
+    attendanceSource: v.string(), // "live_join" | "recording_watch" | "manual_admin"
+    markedAt: v.number(),
+    notes: v.optional(v.string()),
+  }).index("by_user_id", ["userId"])
+    .index("by_batch_id", ["batchId"])
+    .index("by_live_class_id", ["liveClassId"])
+    .index("by_user_live_class", ["userId", "liveClassId"]),
 });

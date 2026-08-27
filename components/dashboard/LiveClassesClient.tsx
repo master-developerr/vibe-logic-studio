@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { JoinClassButton } from "./JoinClassButton";
+import { WatchRecordingButton } from "./WatchRecordingButton";
 import {
   Clock, 
   Calendar, 
@@ -149,14 +151,10 @@ export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerk
           
           <div className="flex flex-row md:flex-col items-stretch justify-center gap-3 shrink-0">
             {heroClass.startTime <= now && heroClass.endTime >= now ? (
-              <a 
-                href={heroClass.meetingLink} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary-hover transition-colors shadow-sm gap-2"
-              >
-                Join Live Class <ArrowRight className="w-4 h-4" />
-              </a>
+              <JoinClassButton
+                sessionId={heroClass._id}
+                meetingLink={heroClass.meetingLink}
+              />
             ) : (
               <button 
                 disabled
@@ -348,12 +346,10 @@ export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerk
                         
                         <td className="py-4 pl-4 pr-6 align-middle text-right whitespace-nowrap">
                           {cls.recordingUrl ? (
-                            <Link 
-                              href={`/dashboard/courses/${batchId}/recordings?id=${cls._id}`}
-                              className="inline-flex items-center gap-1.5 text-primary hover:text-primary-hover text-xs font-bold transition-colors group-hover:underline"
-                            >
-                              Watch Recording <ArrowRight className="w-3.5 h-3.5" />
-                            </Link>
+                            <WatchRecordingButton
+                              sessionId={cls._id}
+                              batchId={batchId}
+                            />
                           ) : (
                             <span className="text-xs font-semibold text-text-muted select-none">
                               Recording unavailable
@@ -404,12 +400,10 @@ export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerk
                     
                     <div className="pt-3 border-t border-border mt-1">
                       {cls.recordingUrl ? (
-                        <Link 
-                          href={`/dashboard/courses/${batchId}/recordings?id=${cls._id}`}
-                          className="inline-flex items-center gap-1.5 text-primary hover:text-primary-hover text-xs font-bold transition-colors"
-                        >
-                          Watch Recording <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
+                        <WatchRecordingButton
+                          sessionId={cls._id}
+                          batchId={batchId}
+                        />
                       ) : (
                         <span className="text-xs font-semibold text-text-muted select-none">
                           Recording unavailable
