@@ -67,6 +67,12 @@ export function BatchCalendarWorkspace({
   const recordingsData = useQuery(api.admin.getBatchRecordingsExtended, {
     batchId: batchId as any,
   });
+  const batchSettingsData = useQuery(api.admin.getBatchSettingsExtended, {
+    batchId: batchId as any,
+  });
+  const eligibleInstructors = useQuery(api.admin.getEligibleInstructors);
+
+  const leadInstructorDefault = batchSettingsData?.settings?.instructorName || "Instructor";
 
   const backendEvents: BatchCalendarEvent[] = useMemo(() => {
     if (!recordingsData?.recordings) return [];
@@ -81,13 +87,13 @@ export function BatchCalendarWorkspace({
       return {
         id: rec.id,
         title: rec.title,
-        eventType: "Live Class",
+        eventType: (rec.eventType as EventType) || "Live Class",
         dateStr,
         startTime: `${startHours}:${startMins}`,
         endTime: `${endHours}:${endMins}`,
         durationMins: Math.round(((rec.endTime || 0) - (rec.startTime || 0)) / 60000) || 120,
         timezone: "Asia/Kolkata (IST)",
-        leadInstructor: rec.instructorName || "Instructor",
+        leadInstructor: rec.instructorName || leadInstructorDefault,
         meetingLink: rec.meetingLink || "",
         module: rec.moduleTitle || "General",
         lesson: rec.title,
@@ -103,7 +109,7 @@ export function BatchCalendarWorkspace({
         colorCategory: "Live Class",
       };
     });
-  }, [recordingsData]);
+  }, [recordingsData, leadInstructorDefault]);
 
   const [events, setEvents] = useState<BatchCalendarEvent[]>(DEFAULT_BATCH_EVENTS);
 
@@ -133,6 +139,50 @@ export function BatchCalendarWorkspace({
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // Dynamic Instructors List
+  const availableInstructors = useMemo(() => {
+    const set = new Set<string>();
+    if (leadInstructorDefault && leadInstructorDefault !== "Instructor") {
+      set.add(leadInstructorDefault);
+    }
+    if (eligibleInstructors && eligibleInstructors.length > 0) {
+      eligibleInstructors.forEach((u) => set.add(u.name));
+    }
+    events.forEach((e) => {
+      if (e.leadInstructor) set.add(e.leadInstructor);
+    });
+    return Array.from(set);
+  }, [leadInstructorDefault, eligibleInstructors, events]);
+
+  // Next Live Session (Dynamic)
+  const nextLiveSession = useMemo(() => {
+    const sorted = [...events]
+      .filter((e) => e.eventType === "Live Class" || e.eventType === "Workshop")
+      .sort((a, b) => new Date(`${a.dateStr}T${a.startTime}`).getTime() - new Date(`${b.dateStr}T${b.startTime}`).getTime());
+    return sorted[0] || null;
+  }, [events]);
+
+  // Critical Milestones & Exams (Dynamic)
+  const criticalMilestones = useMemo(() => {
+    return events.filter(
+      (e) => e.eventType === "Exam" || e.eventType === "Assignment Deadline"
+    );
+  }, [events]);
+
+  // Instructor Workload (Dynamic)
+  const instructorWorkload = useMemo(() => {
+    const map = new Map<string, number>();
+    events.forEach((e) => {
+      const inst = e.leadInstructor || leadInstructorDefault;
+      const hours = Math.round((e.durationMins || 120) / 60);
+      map.set(inst, (map.get(inst) || 0) + hours);
+    });
+    if (map.size === 0 && leadInstructorDefault && leadInstructorDefault !== "Instructor") {
+      map.set(leadInstructorDefault, 0);
+    }
+    return Array.from(map.entries()).map(([name, hours]) => ({ name, hours }));
+  }, [events, leadInstructorDefault]);
 
   // Month navigation helpers
   const monthNames = [
@@ -504,10 +554,11 @@ export function BatchCalendarWorkspace({
             className="h-8 px-2.5 rounded-lg bg-background border border-border text-xs font-medium text-text-primary focus:outline-none"
           >
             <option value="All Instructors">All Instructors</option>
-            <option value="Markus Keren">Markus Keren</option>
-            <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
-            <option value="Alex D'Souza">Alex D'Souza</option>
-            <option value="Elena Rostova">Elena Rostova</option>
+            {availableInstructors.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
 
           <select
@@ -879,35 +930,45 @@ export function BatchCalendarWorkspace({
                 <Video className="w-4 h-4 text-primary" />
                 Next Live Session
               </h3>
-              <span className="text-[10px] font-bold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
-                READY
-              </span>
+              {nextLiveSession && (
+                <span className="text-[10px] font-bold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+                  READY
+                </span>
+              )}
             </div>
 
-            <div className="p-4 rounded-xl bg-background border border-border space-y-3">
-              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 text-[10px] font-bold uppercase">
-                Live Class • Tomorrow
-              </span>
-              <h4 className="text-sm font-bold text-text-primary">
-                Live: TanStack Query & Data Mutations
-              </h4>
-              <p className="text-xs text-text-muted">
-                Aug 17, 2026 • 07:00 PM – 09:00 PM EST
-              </p>
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs font-semibold text-text-primary">
-                  Dr. Sarah Jenkins
+            {nextLiveSession ? (
+              <div className="p-4 rounded-xl bg-background border border-border space-y-3">
+                <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 text-[10px] font-bold uppercase">
+                  {nextLiveSession.eventType} • {nextLiveSession.dateStr}
                 </span>
-                <a
-                  href="https://meet.google.com/vibe-ts-query"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Join Room
-                </a>
+                <h4 className="text-sm font-bold text-text-primary">
+                  {nextLiveSession.title}
+                </h4>
+                <p className="text-xs text-text-muted">
+                  {nextLiveSession.dateStr} • {nextLiveSession.startTime} – {nextLiveSession.endTime}
+                </p>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs font-semibold text-text-primary">
+                    {nextLiveSession.leadInstructor}
+                  </span>
+                  {nextLiveSession.meetingLink && (
+                    <a
+                      href={nextLiveSession.meetingLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
+                    >
+                      Join Room
+                    </a>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-background border border-border text-center text-xs text-text-muted">
+                No upcoming live sessions scheduled.
+              </div>
+            )}
           </div>
 
           {/* WIDGET 2: UPCOMING EXAMS & ASSIGNMENT DEADLINES */}
@@ -916,30 +977,27 @@ export function BatchCalendarWorkspace({
               <Award className="w-4 h-4 text-red-500" />
               Critical Milestones & Exams
             </h3>
-            <div className="space-y-2">
-              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/20 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-red-600">
-                    Mid-Term Comprehensive Exam
-                  </p>
-                  <p className="text-[11px] text-text-muted">
-                    Aug 19 • 10:00 AM EST (3 hrs)
-                  </p>
-                </div>
-                <span className="text-xs font-bold text-red-600">In 4d</span>
+            {criticalMilestones.length > 0 ? (
+              <div className="space-y-2">
+                {criticalMilestones.map((m) => (
+                  <div key={m.id} className="p-3 rounded-xl bg-red-500/5 border border-red-500/20 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-red-600">
+                        {m.title}
+                      </p>
+                      <p className="text-[11px] text-text-muted">
+                        {m.dateStr} • {m.startTime} ({m.durationMins} mins)
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-red-600">{m.leadInstructor}</span>
+                  </div>
+                ))}
               </div>
-              <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-purple-600">
-                    Portfolio V1 Submission
-                  </p>
-                  <p className="text-[11px] text-text-muted">
-                    Aug 05 • Completed & Graded
-                  </p>
-                </div>
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
+            ) : (
+              <div className="p-4 rounded-xl bg-background border border-border text-center text-xs text-text-muted">
+                No critical milestones or exams scheduled.
               </div>
-            </div>
+            )}
           </div>
 
           {/* WIDGET 3: INSTRUCTOR AVAILABILITY & WORKLOAD */}
@@ -948,35 +1006,25 @@ export function BatchCalendarWorkspace({
               <User className="w-4 h-4 text-primary" />
               Instructor Workload
             </h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="font-semibold text-text-primary">
-                    Markus Keren (Lead)
-                  </span>
-                </div>
-                <span className="text-text-muted font-bold">24 hrs sched</span>
+            {instructorWorkload.length > 0 ? (
+              <div className="space-y-2">
+                {instructorWorkload.map((iw, idx) => (
+                  <div key={iw.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-green-500' : idx === 1 ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                      <span className="font-semibold text-text-primary">
+                        {iw.name}
+                      </span>
+                    </div>
+                    <span className="text-text-muted font-bold">{iw.hours} hrs sched</span>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span className="font-semibold text-text-primary">
-                    Dr. Sarah Jenkins
-                  </span>
-                </div>
-                <span className="text-text-muted font-bold">16 hrs sched</span>
+            ) : (
+              <div className="p-4 rounded-xl bg-background border border-border text-center text-xs text-text-muted">
+                No scheduled instructor workload.
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="font-semibold text-text-primary">
-                    Elena Rostova (TA)
-                  </span>
-                </div>
-                <span className="text-text-muted font-bold">8 hrs sched</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* WIDGET 4: CALENDAR STATISTICS & KPIS */}
@@ -1027,16 +1075,20 @@ export function BatchCalendarWorkspace({
               <Clock className="w-4 h-4 text-text-muted" />
               Recent Modifications
             </h3>
-            <div className="space-y-2 text-xs">
-              <p className="text-text-muted">
-                <span className="font-bold text-text-primary">Markus Keren</span>{" "}
-                added <span className="italic">Mid-Term Comprehensive Exam</span>
-              </p>
-              <p className="text-text-muted">
-                <span className="font-bold text-text-primary">Elena Rostova</span>{" "}
-                cancelled <span className="italic">Debugging & QA Workshop</span>
-              </p>
-            </div>
+            {events.length > 0 ? (
+              <div className="space-y-2 text-xs">
+                {events.slice(0, 3).map((ev) => (
+                  <p key={ev.id} className="text-text-muted">
+                    <span className="font-bold text-text-primary">{ev.leadInstructor}</span>{" "}
+                    scheduled <span className="italic">{ev.title}</span>
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 text-center text-xs text-text-muted">
+                No recent schedule modifications.
+              </div>
+            )}
           </div>
         </div>
       </div>

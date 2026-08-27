@@ -1662,6 +1662,7 @@ export const createBatchRecordingExtended = mutation({
     const finalUrl = extractedYtId ? `https://www.youtube.com/embed/${extractedYtId}` : args.recordingUrl;
     const finalSource = extractedYtId ? "YouTube" : (args.videoSource || "AWS S3");
 
+    const batch = await ctx.db.get(args.batchId);
     const now = Date.now();
     const id = await ctx.db.insert("liveClasses", {
       batchId: args.batchId,
@@ -1672,7 +1673,7 @@ export const createBatchRecordingExtended = mutation({
       recordingUrl: finalUrl,
       duration: args.duration || "01:45:00",
       moduleTitle: args.moduleTitle || "Module 1",
-      instructorName: args.instructorName || "Markus Keren",
+      instructorName: args.instructorName || batch?.instructorName || "Instructor",
       views: 0,
       completionRate: 0,
       status: args.status || "Published",
@@ -2402,11 +2403,11 @@ export const getBatchActivityExtended = query({
         id: `real-lc-${lc._id}`,
         type: "instructor",
         category: "Content",
-        title: `Markus Keren scheduled live class "${lc.title}"`,
+        title: `${lc.instructorName || batch.instructorName || "Instructor"} scheduled live class "${lc.title}"`,
         description: `Scheduled for module workshop in ${batch.title}.`,
-        actorName: lc.instructorName || "Markus Keren",
+        actorName: lc.instructorName || batch.instructorName || "Instructor",
         actorRole: "Lead Instructor",
-        actorInitials: "MK",
+        actorInitials: (lc.instructorName || batch.instructorName || "IN").split(" ").map((n: string) => n[0]).join("").slice(0, 2),
         action: "scheduled live class",
         target: lc.title,
         timestamp: lc.startTime - oneDay,

@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 export type EventType =
   | "Live Class"
@@ -172,7 +174,8 @@ export function BatchEventDrawer({
   const [endTime, setEndTime] = useState("19:30");
   const [durationMins, setDurationMins] = useState(90);
   const [timezone, setTimezone] = useState("America/New_York (EST)");
-  const [leadInstructor, setLeadInstructor] = useState("Markus Keren");
+  const eligibleInstructors = useQuery(api.admin.getEligibleInstructors);
+  const [leadInstructor, setLeadInstructor] = useState("Instructor");
   const [assistantInstructor, setAssistantInstructor] = useState("None");
   const [meetingLink, setMeetingLink] = useState("");
   const [moduleName, setModuleName] = useState("");
@@ -651,18 +654,17 @@ export function BatchEventDrawer({
                       onChange={(e) => setLeadInstructor(e.target.value)}
                       className="w-full h-10 px-3 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none"
                     >
-                      <option value="Markus Keren">
-                        Markus Keren (Lead Technical Architect)
-                      </option>
-                      <option value="Dr. Sarah Jenkins">
-                        Dr. Sarah Jenkins (Senior AI Engineer)
-                      </option>
-                      <option value="Alex D'Souza">
-                        Alex D'Souza (Product Operations)
-                      </option>
-                      <option value="Elena Rostova">
-                        Elena Rostova (Full-Stack Mentor)
-                      </option>
+                      {eligibleInstructors && eligibleInstructors.length > 0 ? (
+                        eligibleInstructors.map((u) => (
+                          <option key={u._id} value={u.name}>
+                            {u.name} ({u.role || "Instructor"})
+                          </option>
+                        ))
+                      ) : (
+                        <option value={leadInstructor || "Instructor"}>
+                          {leadInstructor || "Instructor"}
+                        </option>
+                      )}
                     </select>
                   </div>
                   <div>
@@ -675,15 +677,12 @@ export function BatchEventDrawer({
                       className="w-full h-10 px-3 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none"
                     >
                       <option value="None">None (Solo Instructor)</option>
-                      <option value="Elena Rostova">
-                        Elena Rostova (Teaching Assistant)
-                      </option>
-                      <option value="Alex D'Souza">
-                        Alex D'Souza (TA / Moderator)
-                      </option>
-                      <option value="Vikram Seth">
-                        Vikram Seth (Lab Assistant)
-                      </option>
+                      {eligibleInstructors && eligibleInstructors.length > 0 &&
+                        eligibleInstructors.map((u) => (
+                          <option key={`asst-${u._id}`} value={u.name}>
+                            {u.name} ({u.role || "Assistant"})
+                          </option>
+                        ))}
                     </select>
                   </div>
                 </div>

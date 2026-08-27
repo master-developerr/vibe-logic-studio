@@ -26,6 +26,9 @@ import {
   EVENT_TYPE_COLORS,
 } from "./BatchEventDrawer";
 
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+
 interface CreateBatchEventModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,7 +49,14 @@ export function CreateBatchEventModal({
   const [startTime, setStartTime] = useState("18:00");
   const [endTime, setEndTime] = useState("19:30");
   const [durationMins, setDurationMins] = useState(90);
-  const [leadInstructor, setLeadInstructor] = useState("Markus Keren");
+  const [leadInstructor, setLeadInstructor] = useState("Instructor");
+  const eligibleInstructors = useQuery(api.admin.getEligibleInstructors);
+
+  React.useEffect(() => {
+    if (eligibleInstructors && eligibleInstructors.length > 0 && leadInstructor === "Instructor") {
+      setLeadInstructor(eligibleInstructors[0].name);
+    }
+  }, [eligibleInstructors]);
   const [meetingLink, setMeetingLink] = useState(
     "https://meet.google.com/vibe-logic-live"
   );
@@ -270,10 +280,17 @@ export function CreateBatchEventModal({
                     onChange={(e) => setLeadInstructor(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none"
                   >
-                    <option value="Markus Keren">Markus Keren</option>
-                    <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
-                    <option value="Alex D'Souza">Alex D'Souza</option>
-                    <option value="Elena Rostova">Elena Rostova</option>
+                    {eligibleInstructors && eligibleInstructors.length > 0 ? (
+                      eligibleInstructors.map((u) => (
+                        <option key={u._id} value={u.name}>
+                          {u.name} ({u.role || "Instructor"})
+                        </option>
+                      ))
+                    ) : (
+                      <option value={leadInstructor || "Instructor"}>
+                        {leadInstructor || "Instructor"}
+                      </option>
+                    )}
                   </select>
                 </div>
                 <div>
