@@ -1282,7 +1282,7 @@ export const getBatchAnnouncementsExtended = query({
       .withIndex("by_batch_id", (q) => q.eq("batchId", args.batchId))
       .collect();
 
-    const totalStudents = enrollments.length || 24;
+    const totalStudents = enrollments.length;
     let pendingPayments = 0;
     let lowAttendance = 0;
     let missingAssignments = 0;
@@ -1312,10 +1312,10 @@ export const getBatchAnnouncementsExtended = query({
     let totalViews = 0;
     let totalDelivered = 0;
 
-    const announcements = rawAnnouncements.map((a, index) => {
-      const statusVal = a.status || (index === 0 ? "Pinned" : "Published");
+    const announcements = rawAnnouncements.map((a) => {
+      const statusVal = a.status || "Published";
       const targetAudience = a.targetAudience || "Entire Batch";
-      const audienceReach = audienceCounts[targetAudience] || totalStudents;
+      const audienceReach = audienceCounts[targetAudience] ?? totalStudents;
       const views = a.engagement?.views ?? 0;
       const commentsCount = a.engagement?.commentsCount ?? 0;
       const deliveredCount = a.engagement?.deliveredCount ?? audienceReach;
@@ -1337,13 +1337,13 @@ export const getBatchAnnouncementsExtended = query({
         scheduledAtRaw: a.scheduledAt || null,
         isPinned: a.isPinned ?? (statusVal === "Pinned"),
         allowComments: a.allowComments ?? true,
-        authorName: a.authorName || "Alex D'Souza",
+        authorName: a.authorName || "Admin",
         authorRole: a.authorRole || "Product Admin",
         attachments: a.attachments || [],
         broadcastChannels: a.broadcastChannels || {
           inApp: true,
-          whatsapp: true,
-          email: true,
+          whatsapp: !!batch.whatsappLink,
+          email: false,
           push: false,
         },
         engagement: {
@@ -1363,7 +1363,7 @@ export const getBatchAnnouncementsExtended = query({
     const scheduledCount = announcements.filter((a) => a.status === "Scheduled").length;
     const draftCount = announcements.filter((a) => a.status === "Draft").length;
     const avgReadRate =
-      totalDelivered > 0 ? Math.round((totalViews / totalDelivered) * 100) : 88;
+      totalDelivered > 0 ? Math.round((totalViews / totalDelivered) * 100) : 0;
 
     return {
       batch: {
@@ -1371,6 +1371,7 @@ export const getBatchAnnouncementsExtended = query({
         title: batch.title,
         courseTitle: course?.title || "VibeLogic Studio Cohort",
         enrolledCount: totalStudents,
+        whatsappGroupLink: batch.whatsappLink || null,
       },
       announcements,
       audienceCounts,
@@ -1379,7 +1380,7 @@ export const getBatchAnnouncementsExtended = query({
         publishedCount,
         scheduledCount,
         draftCount,
-        avgReadRate: Math.min(100, Math.max(65, avgReadRate)),
+        avgReadRate,
         totalReach: totalStudents,
       },
     };
@@ -1416,15 +1417,18 @@ export const createBatchAnnouncementExtended = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    await requireAdminOrInstructor(ctx);
+    const authUser = await requireAdminOrInstructor(ctx);
 
     const enrollments = await ctx.db
       .query("enrollments")
       .withIndex("by_batch_id", (q) => q.eq("batchId", args.batchId))
       .collect();
 
-    const reach = enrollments.length || 24;
-    const isPub = args.status === "Published" || args.status === "Pinned";
+    const reach = enrollments.length;
+    const batch = await ctx.db.get(args.batchId);
+
+    const authorName = authUser.name || "Admin";
+    const authorRole = authUser.role === "instructor" ? "Cohort Instructor" : "Product Admin";
 
     const id = await ctx.db.insert("announcements", {
       batchId: args.batchId,
@@ -1435,19 +1439,19 @@ export const createBatchAnnouncementExtended = mutation({
       scheduledAt: args.scheduledAt,
       isPinned: args.isPinned || false,
       allowComments: args.allowComments ?? true,
-      authorName: "Alex D'Souza",
-      authorRole: "Product Admin",
+      authorName,
+      authorRole,
       attachments: args.attachments || [],
       broadcastChannels: args.broadcastChannels || {
         inApp: true,
-        whatsapp: true,
-        email: true,
+        whatsapp: !!batch?.whatsappLink,
+        email: false,
         push: false,
       },
       engagement: {
-        views: isPub ? Math.round(reach * 0.88) : 0,
-        commentsCount: isPub ? Math.round(reach * 0.2) : 0,
-        deliveredCount: isPub ? reach : 0,
+        views: 0,
+        commentsCount: 0,
+        deliveredCount: reach,
         totalReach: reach,
       },
       createdAt: Date.now(),

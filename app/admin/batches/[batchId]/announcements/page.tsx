@@ -28,10 +28,10 @@ import {
   Mail,
   Bell,
   Sparkles,
-  ChevronRight,
   FileText,
-  Video,
   ExternalLink,
+  Save,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,6 @@ export default function BatchAnnouncementsPage({
 
   // State Declarations - ALL TOP LEVEL
   const [showComposer, setShowComposer] = useState(false);
-  const [scheduleFocus, setScheduleFocus] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [audienceFilter, setAudienceFilter] = useState("ALL");
@@ -85,8 +84,8 @@ export default function BatchAnnouncementsPage({
   // Convex Queries
   const batches = useQuery(api.admin.getAllBatches) || [];
   const activeBatch = batches.find((b: any) => b._id === batchId);
-  const batchTitle = activeBatch?.title || "November Cohort";
-  const courseTitle = activeBatch?.courseTitle || "Full-Stack Web Development";
+  const batchTitle = activeBatch?.title || "Cohort Workspace";
+  const courseTitle = activeBatch?.courseTitle || "VibeLogic Studio";
 
   const workspace = useQuery(api.admin.getBatchAnnouncementsExtended, {
     batchId: batchId as any,
@@ -116,13 +115,13 @@ export default function BatchAnnouncementsPage({
         isPinned: !!item.isPinned,
         allowComments: item.allowComments !== false,
         authorName: item.authorName || "Admin",
-        authorRole: item.authorRole || "Admin",
+        authorRole: item.authorRole || "Product Admin",
         attachments: item.attachments || [],
         broadcastChannels: item.broadcastChannels || {
           inApp: true,
-          whatsapp: true,
-          email: true,
-          push: true,
+          whatsapp: !!activeBatch?.whatsappLink,
+          email: false,
+          push: false,
         },
         engagement: item.engagement || {
           views: 0,
@@ -135,51 +134,35 @@ export default function BatchAnnouncementsPage({
       }));
     }
     return [];
-  }, [rawAnnouncements, batchTitle, courseTitle]);
+  }, [rawAnnouncements, batchTitle, courseTitle, activeBatch]);
 
-  // Audience counts mapping
+  // Real Audience counts from Convex backend
   const audienceCounts: Record<string, number> = useMemo(
     () =>
       serverAudienceCounts || {
-        "Entire Batch": 0,
-        "Specific Students": 0,
+        "Entire Batch": workspace?.batch?.enrolledCount || 0,
+        "Specific Students": workspace?.batch?.enrolledCount || 0,
         "Students with Pending Payments": 0,
         "Students with Low Attendance": 0,
         "Students Missing Assignments": 0,
-        "Instructors": 0,
+        "Instructors": 1,
       },
-    [serverAudienceCounts]
+    [serverAudienceCounts, workspace]
   );
 
-  // KPIs
+  // Real Database Metrics
   const totalCount = announcementsList.length;
   const draftCount = announcementsList.filter((a) => a.status === "Draft").length;
+  const scheduledCount = announcementsList.filter((a) => a.status === "Scheduled").length;
   const publishedCount = announcementsList.filter(
     (a) => a.status === "Published" || a.status === "Pinned" || a.isPinned
   ).length;
-  const totalReach = announcementsList.reduce((acc, curr) => acc + (curr.engagement.totalReach || 0), 0);
-  const avgReadRate =
-    publishedCount > 0
-      ? Math.round(
-          announcementsList
-            .filter((a) => a.status === "Published" || a.status === "Pinned" || a.isPinned)
-            .reduce(
-              (acc, curr) =>
-                acc +
-                (curr.engagement.deliveredCount > 0
-                  ? (curr.engagement.views / curr.engagement.deliveredCount) * 100
-                  : 88),
-              0
-            ) / publishedCount
-        )
-      : 88;
-  const totalComments = announcementsList.reduce((acc, curr) => acc + (curr.engagement.commentsCount || 0), 0);
+  const pinnedCount = announcementsList.filter((a) => a.isPinned || a.status === "Pinned").length;
 
   // Filtered & Sorted Announcements
   const filteredAnnouncements = useMemo(() => {
     let list = [...announcementsList];
 
-    // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -190,7 +173,6 @@ export default function BatchAnnouncementsPage({
       );
     }
 
-    // Status filter
     if (statusFilter !== "ALL") {
       if (statusFilter === "Pinned") {
         list = list.filter((a) => a.isPinned || a.status === "Pinned");
@@ -199,14 +181,11 @@ export default function BatchAnnouncementsPage({
       }
     }
 
-    // Audience filter
     if (audienceFilter !== "ALL") {
       list = list.filter((a) => a.targetAudience === audienceFilter);
     }
 
-    // Sorting
     list.sort((a, b) => {
-      // Pinned items always on top if newest/oldest
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
 
@@ -224,7 +203,7 @@ export default function BatchAnnouncementsPage({
     return list;
   }, [announcementsList, searchQuery, statusFilter, audienceFilter, sortBy]);
 
-  // Handler functions
+  // Handler functions with Convex mutations
   const handlePublishAnnouncement = async (data: {
     title: string;
     content: string;
@@ -251,18 +230,17 @@ export default function BatchAnnouncementsPage({
       setComposerAttachments([]);
     } catch (err) {
       console.error("Failed to publish announcement:", err);
+      alert("Failed to save announcement. Please check server permissions.");
     }
   };
 
   const handleTogglePin = async (id: string, newPinState: boolean) => {
     try {
-      if (!id.startsWith("mock-")) {
-        await updateAnnMut({
-          id: id as any,
-          isPinned: newPinState,
-          status: newPinState ? "Pinned" : "Published",
-        });
-      }
+      await updateAnnMut({
+        id: id as any,
+        isPinned: newPinState,
+        status: newPinState ? "Pinned" : "Published",
+      });
     } catch (err) {
       console.error("Failed to toggle pin:", err);
     }
@@ -270,12 +248,10 @@ export default function BatchAnnouncementsPage({
 
   const handleArchive = async (id: string) => {
     try {
-      if (!id.startsWith("mock-")) {
-        await updateAnnMut({
-          id: id as any,
-          status: "Archived",
-        });
-      }
+      await updateAnnMut({
+        id: id as any,
+        status: "Archived",
+      });
       if (selectedAnnouncement?.id === id) {
         setIsDrawerOpen(false);
       }
@@ -304,31 +280,30 @@ export default function BatchAnnouncementsPage({
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this announcement?")) return;
     try {
-      if (!id.startsWith("mock-")) {
-        await deleteAnnMut({ id: id as any });
-      }
+      await deleteAnnMut({ id: id as any });
       if (selectedAnnouncement?.id === id) {
         setIsDrawerOpen(false);
       }
     } catch (err) {
-      console.error("Failed to delete:", err);
+      console.error("Failed to delete announcement:", err);
     }
   };
 
   const handlePublishNowFromDrawer = async (id: string) => {
     try {
-      if (!id.startsWith("mock-")) {
-        await updateAnnMut({
-          id: id as any,
-          status: "Published",
-        });
-      }
+      await updateAnnMut({
+        id: id as any,
+        status: "Published",
+      });
       setIsDrawerOpen(false);
     } catch (err) {
       console.error("Failed to publish draft:", err);
     }
   };
+
+  const isFiltersActive = searchQuery.trim() !== "" || statusFilter !== "ALL" || audienceFilter !== "ALL";
 
   return (
     <div className="space-y-6 pb-12">
@@ -337,18 +312,18 @@ export default function BatchAnnouncementsPage({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black tracking-tight text-text-primary">
-              Cohort Announcements & Broadcast Engine
+              Cohort Announcements
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
-              Multi-Channel
+              Live Feed
             </span>
           </div>
           <p className="text-sm text-text-muted mt-1">
-            Manage real-time notifications, scheduled broadcasts, and learner engagement across WhatsApp, Email, and In-App feeds for <strong className="text-text-primary">{batchTitle}</strong>.
+            Broadcast updates, announcements, and notices for <strong className="text-text-primary">{batchTitle}</strong>.
           </p>
         </div>
 
-        {/* Quick Action Buttons */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <Button
             type="button"
@@ -369,7 +344,6 @@ export default function BatchAnnouncementsPage({
             variant="outline"
             onClick={() => {
               setShowComposer(true);
-              setScheduleFocus(true);
             }}
             className="text-xs font-semibold gap-1.5 bg-background hover:bg-surface border-border h-10"
           >
@@ -387,7 +361,7 @@ export default function BatchAnnouncementsPage({
         </div>
       </div>
 
-      {/* 2. KPI Summary Banner (4 Cards) */}
+      {/* 2. Real Database Summary Metrics (4 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-surface border border-border flex items-center justify-between">
           <div>
@@ -397,7 +371,7 @@ export default function BatchAnnouncementsPage({
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-black text-text-primary">{totalCount}</span>
               <span className="text-xs text-text-muted">
-                ({publishedCount} active, {draftCount} drafts)
+                ({publishedCount} published, {draftCount} drafts)
               </span>
             </div>
           </div>
@@ -409,50 +383,50 @@ export default function BatchAnnouncementsPage({
         <div className="p-5 rounded-2xl bg-surface border border-border flex items-center justify-between">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
-              Active Broadcast Reach
+              Published & Pinned
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black text-text-primary">{totalReach}</span>
-              <span className="text-xs text-emerald-600 font-bold">100% delivered</span>
+              <span className="text-2xl font-black text-text-primary">{publishedCount}</span>
+              <span className="text-xs text-amber-600 font-bold">({pinnedCount} pinned)</span>
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-            <Users className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+            <Pin className="w-5 h-5" />
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-surface border border-border flex items-center justify-between">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
-              Avg. Open & Read Rate
+              Scheduled Broadcasts
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black text-text-primary">{avgReadRate}%</span>
-              <span className="text-xs text-text-muted">across cohort</span>
+              <span className="text-2xl font-black text-text-primary">{scheduledCount}</span>
+              <span className="text-xs text-text-muted">upcoming</span>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600">
-            <Eye className="w-5 h-5" />
+            <Calendar className="w-5 h-5" />
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-surface border border-border flex items-center justify-between">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
-              Engagement Score
+              Draft Announcements
             </span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black text-text-primary">{totalComments}</span>
-              <span className="text-xs text-text-muted">Q&A interactions</span>
+              <span className="text-2xl font-black text-text-primary">{draftCount}</span>
+              <span className="text-xs text-text-muted">unpublished</span>
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600">
-            <MessageSquare className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center text-slate-600">
+            <Save className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* 3. Classroom OS 2-Column Layout */}
+      {/* 3. Main 2-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column (8 cols): Composer, Filter Bar, and Announcements Feed */}
         <div className="lg:col-span-8 space-y-6">
@@ -520,40 +494,54 @@ export default function BatchAnnouncementsPage({
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
-                  <option value="readRate">Highest Read Rate</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Announcements Feed List (Cards) */}
+          {/* Announcements Feed List */}
           <div className="space-y-4">
             {filteredAnnouncements.length === 0 ? (
-              <div className="py-16 text-center bg-surface border border-dashed border-border rounded-2xl p-6">
-                <Megaphone className="w-10 h-10 mx-auto text-text-muted mb-2 opacity-40" />
-                <h3 className="font-bold text-sm text-text-primary">No announcements match your filters</h3>
-                <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-                  Try adjusting your search keywords, status filter, or audience criteria, or create a new announcement.
-                </p>
-                <Button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("ALL");
-                    setAudienceFilter("ALL");
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 text-xs font-semibold"
-                >
-                  Clear Filters
-                </Button>
+              <div className="py-16 text-center bg-surface border border-dashed border-border rounded-2xl p-8">
+                <Megaphone className="w-12 h-12 mx-auto text-text-muted mb-3 opacity-40" />
+                {isFiltersActive ? (
+                  <>
+                    <h3 className="font-bold text-base text-text-primary">No announcements match your filters</h3>
+                    <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+                      Try adjusting your search keywords, status filter, or audience criteria.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setStatusFilter("ALL");
+                        setAudienceFilter("ALL");
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="mt-4 text-xs font-semibold"
+                    >
+                      Clear Filters
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-bold text-base text-text-primary">No announcements yet</h3>
+                    <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+                      Create an announcement to communicate with your cohort.
+                    </p>
+                    <Button
+                      onClick={() => setShowComposer(true)}
+                      size="sm"
+                      className="mt-4 text-xs font-bold gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Create Announcement</span>
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
               filteredAnnouncements.map((ann) => {
-                const readRatePct =
-                  ann.engagement.deliveredCount > 0
-                    ? Math.round((ann.engagement.views / ann.engagement.deliveredCount) * 100)
-                    : 88;
                 const isPinnedCard = ann.isPinned || ann.status === "Pinned";
 
                 return (
@@ -563,19 +551,19 @@ export default function BatchAnnouncementsPage({
                       isPinnedCard ? "border-amber-500/40 bg-amber-500/[0.02]" : "border-border"
                     }`}
                   >
-                    {/* Amber Pinned Header Strip */}
+                    {/* Pinned Header Strip */}
                     {isPinnedCard && (
                       <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-1.5 flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-400">
                         <div className="flex items-center gap-1.5">
                           <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                           <span>Pinned to top of cohort feed</span>
                         </div>
-                        <span className="text-[10px] uppercase font-semibold">Priority Broadcast</span>
+                        <span className="text-[10px] uppercase font-semibold">Priority Notice</span>
                       </div>
                     )}
 
                     <div className="p-6 space-y-4">
-                      {/* Top Author + Badges row */}
+                      {/* Top Author + Badges Row */}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">
@@ -658,29 +646,13 @@ export default function BatchAnnouncementsPage({
                         </div>
                       )}
 
-                      {/* Footer Toolbar: Read Rate Meter + Action Buttons */}
+                      {/* Footer Toolbar: Action Buttons */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/60">
-                        {/* Left stats */}
-                        <div className="flex items-center gap-4 text-xs text-text-muted">
-                          <div className="flex items-center gap-1.5">
-                            <Eye className="w-3.5 h-3.5 text-primary" />
-                            <span>
-                              <strong className="text-text-primary font-bold">{readRatePct}%</strong> read rate
-                            </span>
-                          </div>
-                          <span>•</span>
-                          <div className="flex items-center gap-1.5">
-                            <MessageSquare className="w-3.5 h-3.5 text-primary" />
-                            <span>
-                              <strong className="text-text-primary font-bold">
-                                {ann.engagement.commentsCount}
-                              </strong>{" "}
-                              comments
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-3 text-xs text-text-muted">
+                          <span>Audience: <strong className="text-text-primary">{ann.targetAudience}</strong></span>
                         </div>
 
-                        {/* Right Buttons */}
+                        {/* Right Action Buttons */}
                         <div className="flex items-center gap-2">
                           <Button
                             type="button"
@@ -710,7 +682,7 @@ export default function BatchAnnouncementsPage({
                               setIsPreviewOpen(true);
                             }}
                             className="text-xs h-8 px-2.5 font-semibold gap-1"
-                            title="Preview student & WhatsApp view"
+                            title="Preview student view"
                           >
                             <Smartphone className="w-3.5 h-3.5" />
                             <span>Preview</span>
@@ -759,9 +731,9 @@ export default function BatchAnnouncementsPage({
           </div>
         </div>
 
-        {/* Right Sidebar (4 cols): Broadcast Channels, Reach Distribution & AI Insights */}
+        {/* Right Sidebar (4 cols): Broadcast Channels & Audience Reach Breakdown */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Card 1: Broadcast Channels Monitor */}
+          {/* Card 1: Genuine Broadcast Channels Integration Status */}
           <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <h3 className="font-bold text-sm text-text-primary flex items-center gap-2">
@@ -769,43 +741,17 @@ export default function BatchAnnouncementsPage({
                 Broadcast Channels
               </h3>
               <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-                4 Active
+                1 Active
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
               <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <Smartphone className="w-4 h-4 text-emerald-600" />
-                  <div>
-                    <span className="font-bold text-text-primary block">WhatsApp Business API</span>
-                    <span className="text-[10px] text-text-muted">Instant delivery via Twilio</span>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-                  Connected
-                </span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Mail className="w-4 h-4 text-blue-600" />
-                  <div>
-                    <span className="font-bold text-text-primary block">Email Newsletter Engine</span>
-                    <span className="text-[10px] text-text-muted">High-deliverability Resend SMTP</span>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-                  Connected
-                </span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Bell className="w-4 h-4 text-purple-600" />
+                  <Bell className="w-4 h-4 text-emerald-600" />
                   <div>
                     <span className="font-bold text-text-primary block">In-App Dashboard Feed</span>
-                    <span className="text-[10px] text-text-muted">Real-time web notifications</span>
+                    <span className="text-[10px] text-text-muted">Convex Real-Time Sync</span>
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
@@ -815,20 +761,54 @@ export default function BatchAnnouncementsPage({
 
               <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <Smartphone className="w-4 h-4 text-text-muted" />
                   <div>
-                    <span className="font-bold text-text-primary block">Mobile Push (Expo)</span>
-                    <span className="text-[10px] text-text-muted">iOS & Android push queue</span>
+                    <span className="font-bold text-text-primary block">WhatsApp Community</span>
+                    <span className="text-[10px] text-text-muted">
+                      {activeBatch?.whatsappLink ? "Group Link Configured" : "Batch Group Link"}
+                    </span>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-                  Ready
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    activeBatch?.whatsappLink
+                      ? "bg-emerald-500/10 text-emerald-600"
+                      : "bg-slate-500/10 text-slate-500"
+                  }`}
+                >
+                  {activeBatch?.whatsappLink ? "Configured" : "Not Configured"}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Mail className="w-4 h-4 text-text-muted" />
+                  <div>
+                    <span className="font-bold text-text-primary block">Email Notifications</span>
+                    <span className="text-[10px] text-text-muted">SMTP / Resend Integration</span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-slate-500/10 text-slate-500 text-[10px] font-bold">
+                  Not Configured
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="w-4 h-4 text-text-muted" />
+                  <div>
+                    <span className="font-bold text-text-primary block">Mobile Push Queue</span>
+                    <span className="text-[10px] text-text-muted">Expo Push Notifications</span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-slate-500/10 text-slate-500 text-[10px] font-bold">
+                  Not Configured
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Broadcast Status & Reach Breakdown */}
+          {/* Card 2: Audience Segment Reach (Calculated from Real DB Enrollments) */}
           <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
             <h3 className="font-bold text-sm text-text-primary flex items-center gap-2 pb-2 border-b border-border/60">
               <BarChart3 className="w-4 h-4 text-primary" />
@@ -839,64 +819,109 @@ export default function BatchAnnouncementsPage({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-text-secondary">Entire Batch (All Learners)</span>
-                  <span className="font-bold text-text-primary">24 / 24</span>
+                  <span className="font-bold text-text-primary">
+                    {audienceCounts["Entire Batch"] || 0} learners
+                  </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div className="h-full bg-primary rounded-full w-full" />
+                  <div
+                    className="h-full bg-primary rounded-full"
+                    style={{
+                      width: audienceCounts["Entire Batch"] > 0 ? "100%" : "0%",
+                    }}
+                  />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-text-secondary">Pending Fee Installments</span>
-                  <span className="font-bold text-text-primary">3 learners</span>
+                  <span className="font-bold text-text-primary">
+                    {audienceCounts["Students with Pending Payments"] || 0} learners
+                  </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full w-[12%]" />
+                  <div
+                    className="h-full bg-amber-500 rounded-full"
+                    style={{
+                      width:
+                        audienceCounts["Entire Batch"] > 0
+                          ? `${Math.round(
+                              ((audienceCounts["Students with Pending Payments"] || 0) /
+                                audienceCounts["Entire Batch"]) *
+                                100
+                            )}%`
+                          : "0%",
+                    }}
+                  />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-text-secondary">Low Attendance (&lt; 75%)</span>
-                  <span className="font-bold text-text-primary">4 learners</span>
+                  <span className="font-bold text-text-primary">
+                    {audienceCounts["Students with Low Attendance"] || 0} learners
+                  </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div className="h-full bg-red-500 rounded-full w-[16%]" />
+                  <div
+                    className="h-full bg-red-500 rounded-full"
+                    style={{
+                      width:
+                        audienceCounts["Entire Batch"] > 0
+                          ? `${Math.round(
+                              ((audienceCounts["Students with Low Attendance"] || 0) /
+                                audienceCounts["Entire Batch"]) *
+                                100
+                            )}%`
+                          : "0%",
+                    }}
+                  />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-text-secondary">Missing Capstone / Assign.</span>
-                  <span className="font-bold text-text-primary">5 learners</span>
+                  <span className="font-semibold text-text-secondary">Missing Assignments</span>
+                  <span className="font-bold text-text-primary">
+                    {audienceCounts["Students Missing Assignments"] || 0} learners
+                  </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full w-[20%]" />
+                  <div
+                    className="h-full bg-blue-500 rounded-full"
+                    style={{
+                      width:
+                        audienceCounts["Entire Batch"] > 0
+                          ? `${Math.round(
+                              ((audienceCounts["Students Missing Assignments"] || 0) /
+                                audienceCounts["Entire Batch"]) *
+                                100
+                            )}%`
+                          : "0%",
+                    }}
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Card 3: AI Engagement & Timing Insights Panel */}
+          {/* Card 3: AI Engagement Insights (State when no data) */}
           <div className="bg-gradient-to-br from-primary/5 via-surface to-surface border border-primary/20 rounded-2xl p-6 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
               <h3 className="font-bold text-sm text-text-primary">
-                AI Engagement Timing Insight
+                AI Engagement Insights
               </h3>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Based on historical telemetry for <strong className="text-text-primary">{batchTitle}</strong>, announcements broadcasted on <strong>Tuesday or Thursday mornings at 10:30 AM</strong> achieve a <strong>96% open rate</strong> within 2 hours.
+              {totalCount > 0
+                ? `Active broadcast engine currently syncing ${totalCount} announcement${
+                    totalCount > 1 ? "s" : ""
+                  } across ${batchTitle} learners.`
+                : "Engagement & timing insights will appear once announcements have been broadcasted to cohort learners."}
             </p>
-            <div className="pt-2 border-t border-border/60">
-              <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-1">
-                Top Performing Topic
-              </p>
-              <span className="inline-block px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-bold text-primary">
-                ⚡ Project Deadlines & Submissions
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -906,32 +931,8 @@ export default function BatchAnnouncementsPage({
         isOpen={isAttachmentModalOpen}
         onClose={() => setIsAttachmentModalOpen(false)}
         onAddAttachment={(att) => setComposerAttachments((prev) => [...prev, att])}
-        existingStudyMaterials={[
-          {
-            id: "mat-1",
-            title: "November Cohort Capstone Guide PDF",
-            type: "PDF",
-            fileUrl: "#",
-          },
-          {
-            id: "mat-2",
-            title: "System Design Cheat Sheet v3",
-            type: "PDF",
-            fileUrl: "#",
-          },
-        ]}
-        existingRecordings={[
-          {
-            id: "rec-1",
-            title: "Session #14: Scalable Microservices Architecture",
-            recordingUrl: "#",
-          },
-          {
-            id: "rec-2",
-            title: "Session #15: Advanced Postgres Indexing",
-            recordingUrl: "#",
-          },
-        ]}
+        existingStudyMaterials={[]}
+        existingRecordings={[]}
       />
 
       <BatchAnnouncementPreviewModal

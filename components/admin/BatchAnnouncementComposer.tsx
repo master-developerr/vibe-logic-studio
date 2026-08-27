@@ -70,7 +70,7 @@ export function BatchAnnouncementComposer({
   const [loading, setLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState("Last auto-saved just now");
 
-  const estimatedReach = audienceCounts[targetAudience] ?? 24;
+  const estimatedReach = audienceCounts[targetAudience] ?? audienceCounts["Entire Batch"] ?? 0;
 
   const insertFormatting = (tag: string) => {
     if (tag === "B") setContent((prev) => prev + " **Bold Text** ");
@@ -312,12 +312,12 @@ export function BatchAnnouncementComposer({
                 onChange={(e) => setTargetAudience(e.target.value)}
                 className="w-full h-10 px-3 pr-8 rounded-lg border border-border bg-background text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <option value="Entire Batch">All Students ({audienceCounts["Entire Batch"] ?? 24})</option>
-                <option value="Specific Students">Specific Students ({audienceCounts["Specific Students"] ?? 10})</option>
-                <option value="Students with Pending Payments">Students with Pending Payments ({audienceCounts["Students with Pending Payments"] ?? 3})</option>
-                <option value="Students with Low Attendance">Students with Low Attendance ({audienceCounts["Students with Low Attendance"] ?? 4})</option>
-                <option value="Students Missing Assignments">Students Missing Assignments ({audienceCounts["Students Missing Assignments"] ?? 5})</option>
-                <option value="Instructors">Instructors Only ({audienceCounts["Instructors"] ?? 2})</option>
+                <option value="Entire Batch">All Students ({audienceCounts["Entire Batch"] ?? 0})</option>
+                <option value="Specific Students">Specific Students ({audienceCounts["Specific Students"] ?? 0})</option>
+                <option value="Students with Pending Payments">Students with Pending Payments ({audienceCounts["Students with Pending Payments"] ?? 0})</option>
+                <option value="Students with Low Attendance">Students with Low Attendance ({audienceCounts["Students with Low Attendance"] ?? 0})</option>
+                <option value="Students Missing Assignments">Students Missing Assignments ({audienceCounts["Students Missing Assignments"] ?? 0})</option>
+                <option value="Instructors">Instructors Only ({audienceCounts["Instructors"] ?? 1})</option>
               </select>
               <div className="absolute right-3 top-2.5 pointer-events-none text-text-muted">
                 <Users className="w-4 h-4" />

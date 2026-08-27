@@ -85,7 +85,7 @@ export function BatchAnnouncementDrawer({
   const readRate =
     announcement.engagement.deliveredCount > 0
       ? Math.round((announcement.engagement.views / announcement.engagement.deliveredCount) * 100)
-      : 88;
+      : 0;
 
   const isPub = announcement.status === "Published" || announcement.status === "Pinned" || announcement.isPinned;
 
