@@ -27,11 +27,12 @@ export const getUserDashboard = query({
             title: course.title,
             category: course.category,
             coverImageUrl: course.coverImageUrl,
-            instructorName: course.instructorName,
+            instructorName: batch?.instructorName || course.instructorName,
           } : null,
           batch: batch ? {
             id: batch._id,
             title: batch.title,
+            instructorName: batch.instructorName,
             startDate: batch.startDate,
             endDate: batch.endDate,
           } : null,

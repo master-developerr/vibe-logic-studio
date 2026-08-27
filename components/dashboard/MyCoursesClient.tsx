@@ -60,7 +60,7 @@ export function MyCoursesClient({
       category: e.course.category || "GENERAL",
       description: e.course.description || "",
       coverImageUrl: e.course.coverImageUrl,
-      instructorName: e.course.instructorName,
+      instructorName: e.batch?.instructorName || e.course.instructorName,
       enrollmentId: e.enrollmentId,
       progress: e.progress || 0,
       batch: e.batch,

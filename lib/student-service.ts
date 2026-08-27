@@ -163,29 +163,13 @@ export async function getBatchLMS(clerkId: string, batchId: string, token?: stri
 }
 
 export async function getCourseDashboardContext(clerkId: string, batchId: string, token?: string): Promise<any> {
-  const cacheKey = `student:dashboardContext:${clerkId}:${batchId}`;
-  
-  if (redis) {
-    try {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        return cached;
-      }
-    } catch (error) {
-      if (isDynamicServerError(error)) {
-        throw error;
-      }
-      console.error("Redis cache error:", error);
-    }
-  }
-
   const contextData = await fetchQuery(api.student.getCourseDashboardContext, { 
     batchId: batchId as Id<"batches">
   }, { token });
   
   if (!contextData) return null;
 
-  const formattedData = {
+  return {
     ...contextData,
     liveClasses: contextData.liveClasses.map((c: any) => ({
       ...c,
@@ -206,19 +190,6 @@ export async function getCourseDashboardContext(clerkId: string, batchId: string
       timestamp: new Date(a.timestamp).toISOString(),
     })),
   };
-
-  if (redis) {
-    try {
-      await redis.set(cacheKey, formattedData, { ex: CACHE_TTL });
-    } catch (error) {
-      if (isDynamicServerError(error)) {
-        throw error;
-      }
-      console.error("Redis cache set error:", error);
-    }
-  }
-
-  return formattedData;
 }
 
 export async function updateStudentProfile(clerkId: string, name: string, avatarUrl?: string) {

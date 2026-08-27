@@ -191,7 +191,7 @@ export function DashboardClient({
                       {enrollment.course?.title || "Enrolled Course"}
                     </h3>
                     <p className="text-xs text-gray-500 mb-8">
-                      Instructor: {enrollment.course?.instructorName || "TBA"} • {enrollment.batch?.title || "Active Batch"}
+                      Instructor: {enrollment.batch?.instructorName || enrollment.course?.instructorName || "TBA"} • {enrollment.batch?.title || "Active Batch"}
                     </p>
                     
                     <div className="mt-auto">

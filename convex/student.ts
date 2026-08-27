@@ -116,17 +116,17 @@ export const getCourseDashboardContext = query({
       .filter((q) => q.eq(q.field("userId"), authUser._id))
       .collect();
       
-    // Instructor Details
+    // Instructor Details: Prioritize batch-assigned instructor, fallback to course default
     let instructor = null;
-    if (course.instructorName) {
-      instructor = {
-        name: course.instructorName,
-        role: course.instructorRole || "Instructor"
-      };
-    } else if (batch.instructorName) {
+    if (batch.instructorName) {
       instructor = {
         name: batch.instructorName,
         role: "Instructor"
+      };
+    } else if (course.instructorName) {
+      instructor = {
+        name: course.instructorName,
+        role: course.instructorRole || "Instructor"
       };
     }
 
