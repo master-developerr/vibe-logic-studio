@@ -14,6 +14,7 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { extractYouTubeVideoId, getYouTubeEmbedUrl, isYouTubeUrl } from "@/lib/youtube";
 
 interface ReplaceRecordingModalProps {
   isOpen: boolean;
@@ -57,6 +58,17 @@ export default function ReplaceRecordingModal({
       return;
     }
 
+    const vid = extractYouTubeVideoId(newUrl);
+    const isYt = isYouTubeUrl(newUrl) || newSource === "YouTube";
+    if (newSource === "YouTube" && !vid) {
+      setErrorMessage("Invalid YouTube URL. Please enter a valid YouTube share link (e.g. https://youtu.be/...) or watch URL.");
+      return;
+    }
+
+    const finalVideoSource = isYt ? "YouTube" : newSource;
+    const finalYoutubeVideoId = vid || undefined;
+    const finalRecordingUrl = vid ? (getYouTubeEmbedUrl(newUrl) || newUrl.trim()) : newUrl.trim();
+
     setIsReplacing(true);
     setErrorMessage("");
 
@@ -64,8 +76,9 @@ export default function ReplaceRecordingModal({
       if (!targetId.startsWith("mock-")) {
         await updateRecording({
           id: targetId as any,
-          recordingUrl: newUrl.trim(),
-          videoSource: newSource,
+          recordingUrl: finalRecordingUrl,
+          videoSource: finalVideoSource,
+          youtubeVideoId: finalYoutubeVideoId,
         });
       }
 

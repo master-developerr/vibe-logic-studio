@@ -1623,6 +1623,15 @@ export const getBatchRecordingsExtended = query({
   },
 });
 
+function parseYouTubeIdServer(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  const regex = /(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = trimmed.match(regex);
+  return match ? match[1] : undefined;
+}
+
 export const createBatchRecordingExtended = mutation({
   args: {
     batchId: v.id("batches"),
@@ -1649,6 +1658,10 @@ export const createBatchRecordingExtended = mutation({
   handler: async (ctx, args) => {
     await requireAdminOrInstructor(ctx);
 
+    const extractedYtId = args.youtubeVideoId || parseYouTubeIdServer(args.recordingUrl);
+    const finalUrl = extractedYtId ? `https://www.youtube.com/embed/${extractedYtId}` : args.recordingUrl;
+    const finalSource = extractedYtId ? "YouTube" : (args.videoSource || "AWS S3");
+
     const now = Date.now();
     const id = await ctx.db.insert("liveClasses", {
       batchId: args.batchId,
@@ -1656,7 +1669,7 @@ export const createBatchRecordingExtended = mutation({
       startTime: now - 3600000 * 2,
       endTime: now,
       meetingLink: "https://meet.google.com",
-      recordingUrl: args.recordingUrl,
+      recordingUrl: finalUrl,
       duration: args.duration || "01:45:00",
       moduleTitle: args.moduleTitle || "Module 1",
       instructorName: args.instructorName || "Markus Keren",
@@ -1664,8 +1677,8 @@ export const createBatchRecordingExtended = mutation({
       completionRate: 0,
       status: args.status || "Published",
       visibility: args.visibility || "Public to Batch",
-      videoSource: args.videoSource || "YouTube",
-      youtubeVideoId: args.youtubeVideoId,
+      videoSource: finalSource,
+      youtubeVideoId: extractedYtId,
       description: args.description || "HD Replay session recording.",
       attachments: args.attachments || [],
     });
@@ -1704,7 +1717,16 @@ export const updateBatchRecordingExtended = mutation({
 
     const updates: Record<string, any> = {};
     if (args.title !== undefined) updates.title = args.title;
-    if (args.recordingUrl !== undefined) updates.recordingUrl = args.recordingUrl;
+    if (args.recordingUrl !== undefined) {
+      const extractedYtId = args.youtubeVideoId || parseYouTubeIdServer(args.recordingUrl);
+      if (extractedYtId) {
+        updates.youtubeVideoId = extractedYtId;
+        updates.recordingUrl = `https://www.youtube.com/embed/${extractedYtId}`;
+        updates.videoSource = "YouTube";
+      } else {
+        updates.recordingUrl = args.recordingUrl;
+      }
+    }
     if (args.duration !== undefined) updates.duration = args.duration;
     if (args.moduleTitle !== undefined) updates.moduleTitle = args.moduleTitle;
     if (args.instructorName !== undefined) updates.instructorName = args.instructorName;

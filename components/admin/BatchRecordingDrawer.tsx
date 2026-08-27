@@ -28,6 +28,7 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 interface RecordingItem {
   id: Id<"liveClasses">;
@@ -310,44 +311,58 @@ export default function BatchRecordingDrawer({
             </div>
 
             {/* TAB 1: PREVIEW */}
-            {activeTab === "PREVIEW" && (
-              <div className="space-y-4">
-                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-slate-900 border border-border shadow-lg">
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent z-10" />
+            {activeTab === "PREVIEW" && (() => {
+              const ytVid = recording.youtubeVideoId || extractYouTubeVideoId(recording.recordingUrl);
+              return (
+                <div className="space-y-4">
+                  <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-slate-900 border border-border shadow-lg">
+                    {ytVid ? (
+                      <iframe
+                        src={`https://www.youtube.com/embed/${ytVid}?autoplay=0&rel=0`}
+                        title={recording.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        className="w-full h-full border-0 absolute inset-0 rounded-2xl"
+                      />
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent z-10" />
 
-                  {/* Decorative waveform representation */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-25">
-                    <div className="flex items-end gap-1.5 h-16">
-                      <span className="w-2 h-8 bg-primary rounded-full animate-pulse" />
-                      <span className="w-2 h-14 bg-primary rounded-full animate-pulse delay-75" />
-                      <span className="w-2 h-6 bg-primary rounded-full animate-pulse delay-150" />
-                      <span className="w-2 h-12 bg-primary rounded-full animate-pulse delay-200" />
-                      <span className="w-2 h-16 bg-primary rounded-full animate-pulse delay-300" />
-                      <span className="w-2 h-10 bg-primary rounded-full animate-pulse" />
-                    </div>
+                        {/* Decorative waveform representation */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-25">
+                          <div className="flex items-end gap-1.5 h-16">
+                            <span className="w-2 h-8 bg-primary rounded-full animate-pulse" />
+                            <span className="w-2 h-14 bg-primary rounded-full animate-pulse delay-75" />
+                            <span className="w-2 h-6 bg-primary rounded-full animate-pulse delay-150" />
+                            <span className="w-2 h-12 bg-primary rounded-full animate-pulse delay-200" />
+                            <span className="w-2 h-16 bg-primary rounded-full animate-pulse delay-300" />
+                            <span className="w-2 h-10 bg-primary rounded-full animate-pulse" />
+                          </div>
+                        </div>
+
+                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
+                          <a
+                            href={recording.recordingUrl || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-2xl hover:scale-105 transition-transform"
+                          >
+                            <Play className="h-8 w-8 ml-1" />
+                          </a>
+                          <span className="mt-3 text-xs font-bold text-white tracking-wide">
+                            OPEN 1080P CLASSROOM STREAM
+                          </span>
+                        </div>
+
+                        {recording.duration && (
+                          <div className="absolute bottom-4 right-4 z-20 rounded-md bg-black/80 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-white flex items-center gap-1 border border-white/10">
+                            <Clock className="h-3 w-3 text-primary" />
+                            <span>{recording.duration}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-
-                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
-                    <a
-                      href={recording.recordingUrl || "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-2xl hover:scale-105 transition-transform"
-                    >
-                      <Play className="h-8 w-8 ml-1" />
-                    </a>
-                    <span className="mt-3 text-xs font-bold text-white tracking-wide">
-                      OPEN 1080P CLASSROOM STREAM
-                    </span>
-                  </div>
-
-                  {recording.duration && (
-                    <div className="absolute bottom-4 right-4 z-20 rounded-md bg-black/80 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-white flex items-center gap-1 border border-white/10">
-                      <Clock className="h-3 w-3 text-primary" />
-                      <span>{recording.duration}</span>
-                    </div>
-                  )}
-                </div>
 
                 <div className="rounded-2xl border border-border bg-background p-4 flex items-center justify-between">
                   <div className="text-xs text-text-muted">
@@ -369,7 +384,8 @@ export default function BatchRecordingDrawer({
                   )}
                 </div>
               </div>
-            )}
+            );
+          })()}
 
             {/* TAB 2: ANALYTICS */}
             {activeTab === "ANALYTICS" && (

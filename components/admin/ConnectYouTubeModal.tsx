@@ -16,6 +16,7 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { extractYouTubeVideoId, getYouTubeEmbedUrl } from "@/lib/youtube";
 
 function YoutubeIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -61,18 +62,11 @@ export default function ConnectYouTubeModal({
 
   if (!isOpen) return null;
 
-  const extractYouTubeId = (url: string): string | null => {
-    const regex =
-      /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-  };
-
   const handleVerifyUrl = () => {
-    const vid = extractYouTubeId(youtubeUrl.trim());
+    const vid = extractYouTubeVideoId(youtubeUrl.trim());
     if (!vid) {
       setErrorMessage(
-        "Invalid YouTube URL. Please provide a standard YouTube share or watch URL."
+        "Invalid YouTube URL. Please provide a standard YouTube share link (e.g. https://youtu.be/...) or watch URL."
       );
       setSyncedPreview(null);
       return;
@@ -87,9 +81,9 @@ export default function ConnectYouTubeModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const vid = extractYouTubeId(youtubeUrl.trim());
+    const vid = extractYouTubeVideoId(youtubeUrl.trim());
     if (!vid) {
-      setErrorMessage("Please enter a valid YouTube live or archived video URL.");
+      setErrorMessage("Please enter a valid YouTube live, share, or archived video URL.");
       return;
     }
 
@@ -97,11 +91,13 @@ export default function ConnectYouTubeModal({
     setErrorMessage("");
 
     try {
+      const cleanEmbedUrl = getYouTubeEmbedUrl(youtubeUrl) || youtubeUrl.trim();
+
       if (!batchId.toString().startsWith("mock-") && !batchId.toString().startsWith("demo-")) {
         await createRecMut({
           batchId: batchId as any,
           title: titleOverride.trim() || `YouTube Live Stream (${vid})`,
-          recordingUrl: youtubeUrl.trim(),
+          recordingUrl: cleanEmbedUrl,
           youtubeVideoId: vid,
           videoSource: "YouTube",
           moduleTitle,

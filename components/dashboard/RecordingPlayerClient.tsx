@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 interface RecordingPlayerClientProps {
   batchId: Id<"batches">;
@@ -46,24 +47,39 @@ export function RecordingPlayerClient({ batchId, recordingId, clerkId }: Recordi
     ? recordings![currentRecordingIndex + 1] 
     : null;
 
+  const youtubeVideoId = useMemo(() => {
+    if (!recording) return null;
+    return recording.youtubeVideoId || extractYouTubeVideoId(recording.recordingUrl);
+  }, [recording]);
+
   useEffect(() => {
-    if (!recording || !videoRef.current || hasRestoredProgress) return;
+    if (!recording || !videoRef.current || hasRestoredProgress || youtubeVideoId) return;
     
     const savedTime = recording.watchProgress?.timestamp;
     if (savedTime && savedTime > 0) {
       videoRef.current.currentTime = savedTime;
     }
     setHasRestoredProgress(true);
-  }, [recording, hasRestoredProgress]);
+  }, [recording, hasRestoredProgress, youtubeVideoId]);
 
   useEffect(() => {
-    if (!recording || !videoRef.current) return;
-    const video = videoRef.current;
+    if (!recording) return;
 
-    const handleTimeUpdate = () => {
-      // We throttle updates to the database to avoid spamming.
-      // E.g. every 10 seconds.
-    };
+    if (youtubeVideoId) {
+      // Periodic progress update for YouTube embeds
+      const interval = setInterval(() => {
+        updateProgress({
+          batchId,
+          recordingId: recording._id as Id<"liveClasses">,
+          timestamp: 60,
+          percentage: 100,
+        }).catch(() => {});
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+
+    if (!videoRef.current) return;
+    const video = videoRef.current;
 
     let interval = setInterval(() => {
       if (video && !video.paused) {
@@ -81,12 +97,12 @@ export function RecordingPlayerClient({ batchId, recordingId, clerkId }: Recordi
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [recording, batchId, updateProgress]);
+  }, [recording, batchId, updateProgress, youtubeVideoId]);
 
   // Sync on unmount
   useEffect(() => {
     return () => {
-      if (videoRef.current && recording) {
+      if (videoRef.current && recording && !youtubeVideoId) {
         const currentTime = videoRef.current.currentTime;
         const duration = videoRef.current.duration || 1;
         const percentage = Math.round((currentTime / duration) * 100);
@@ -99,7 +115,7 @@ export function RecordingPlayerClient({ batchId, recordingId, clerkId }: Recordi
         }).catch(console.error);
       }
     };
-  }, [recording, batchId, updateProgress]);
+  }, [recording, batchId, updateProgress, youtubeVideoId]);
 
   if (isLoading) {
     return (
@@ -142,16 +158,26 @@ export function RecordingPlayerClient({ batchId, recordingId, clerkId }: Recordi
       </nav>
 
       {/* VIDEO PLAYER */}
-      <div className="w-full bg-black rounded-2xl overflow-hidden shadow-sm border border-border mb-6 aspect-video flex items-center justify-center">
-        <video
-          ref={videoRef}
-          controls
-          autoPlay
-          src={recording.recordingUrl}
-          className="w-full h-full object-contain"
-        >
-          Your browser does not support HTML5 video.
-        </video>
+      <div className="w-full bg-black rounded-2xl overflow-hidden shadow-sm border border-border mb-6 aspect-video relative flex items-center justify-center">
+        {youtubeVideoId ? (
+          <iframe
+            src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&rel=0`}
+            title={recording.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="w-full h-full border-0 absolute inset-0 rounded-2xl"
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            controls
+            autoPlay
+            src={recording.recordingUrl}
+            className="w-full h-full object-contain"
+          >
+            Your browser does not support HTML5 video.
+          </video>
+        )}
       </div>
 
       {/* METADATA & NAV */}

@@ -20,6 +20,7 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { extractYouTubeVideoId, getYouTubeEmbedUrl, isYouTubeUrl } from "@/lib/youtube";
 
 interface UploadBatchRecordingModalProps {
   isOpen: boolean;
@@ -90,6 +91,17 @@ export default function UploadBatchRecordingModal({
       return;
     }
 
+    const vid = extractYouTubeVideoId(recordingUrl);
+    const isYt = isYouTubeUrl(recordingUrl) || videoSource === "YouTube";
+    if (videoSource === "YouTube" && !vid) {
+      setErrorMessage("Invalid YouTube URL. Please enter a valid YouTube share link (e.g. https://youtu.be/...) or watch URL.");
+      return;
+    }
+
+    const finalVideoSource = isYt ? "YouTube" : videoSource;
+    const finalYoutubeVideoId = vid || undefined;
+    const finalRecordingUrl = vid ? (getYouTubeEmbedUrl(recordingUrl) || recordingUrl.trim()) : recordingUrl.trim();
+
     setIsSubmitting(true);
     setErrorMessage("");
 
@@ -97,14 +109,15 @@ export default function UploadBatchRecordingModal({
       await createRecMut({
         batchId: batchId as any,
         title: title.trim(),
-        recordingUrl: recordingUrl.trim(),
+        recordingUrl: finalRecordingUrl,
         duration,
         moduleTitle,
         instructorName: instructorName.trim() || "Alex D'Souza",
         description: description.trim() || undefined,
         status,
         visibility,
-        videoSource,
+        videoSource: finalVideoSource,
+        youtubeVideoId: finalYoutubeVideoId,
       });
 
       setTitle("");

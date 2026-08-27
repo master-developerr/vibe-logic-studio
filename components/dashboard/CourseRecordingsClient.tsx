@@ -14,6 +14,7 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 interface CourseRecordingsClientProps {
   batchId: Id<"batches">;
@@ -277,6 +278,7 @@ export function CourseRecordingsClient({ batchId, clerkId }: CourseRecordingsCli
             let progressColor = "bg-border";
             if (pStatus === "Partially Watched") progressColor = "bg-primary";
             if (pStatus === "Completed") progressColor = "bg-green-500";
+            const ytVid = rec.youtubeVideoId || extractYouTubeVideoId(rec.recordingUrl);
 
             return (
               <div
@@ -285,13 +287,13 @@ export function CourseRecordingsClient({ batchId, clerkId }: CourseRecordingsCli
               >
                 {/* THUMBNAIL */}
                 <div className="relative w-full md:w-[190px] h-[160px] md:h-auto md:min-h-[140px] shrink-0 bg-gray-900 rounded-[10px] overflow-hidden border border-gray-800 flex items-center justify-center">
-                  {rec.youtubeVideoId ? (
+                  {ytVid ? (
                     <img 
-                      src={`https://img.youtube.com/vi/${rec.youtubeVideoId}/maxresdefault.jpg`}
+                      src={`https://img.youtube.com/vi/${ytVid}/maxresdefault.jpg`}
                       alt="Thumbnail"
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${rec.youtubeVideoId}/hqdefault.jpg`;
+                        (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${ytVid}/hqdefault.jpg`;
                       }}
                     />
                   ) : (
