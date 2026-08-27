@@ -65,7 +65,7 @@ export function BatchSettingsToolbar({
             </p>
             <p className="text-xs text-text-secondary flex items-center justify-end gap-1 mt-0.5">
               <Clock className="w-3 h-3 text-text-muted" />
-              {settings.instructorName || "Marcus Krenn"}
+              {settings.instructorName || "Unassigned"}
             </p>
           </div>
         </div>

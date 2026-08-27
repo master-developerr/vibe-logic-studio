@@ -3,6 +3,13 @@
 import React from "react";
 import { Layers, Calendar, Globe, UserCheck, BookOpen } from "lucide-react";
 
+export interface EligibleInstructor {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 interface BatchSettingsGeneralProps {
   title: string;
   description: string;
@@ -13,6 +20,7 @@ interface BatchSettingsGeneralProps {
   status: string;
   courseTitle: string;
   courseSlug: string;
+  instructors?: EligibleInstructor[];
   onChange: (field: string, value: string) => void;
 }
 
@@ -26,6 +34,7 @@ export function BatchSettingsGeneral({
   status,
   courseTitle,
   courseSlug,
+  instructors = [],
   onChange,
 }: BatchSettingsGeneralProps) {
   return (
@@ -86,10 +95,20 @@ export function BatchSettingsGeneral({
               onChange={(e) => onChange("instructorName", e.target.value)}
               className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none"
             >
-              <option value="Marcus Krenn">Marcus Krenn (Lead AI Architect)</option>
-              <option value="Alex D'Souza">Alex D&apos;Souza (Product Admin)</option>
-              <option value="Sarah Chen">Sarah Chen (Senior Fullstack Lead)</option>
-              <option value="Elena Rostova">Elena Rostova (Systems Engineer)</option>
+              {(!instructors || instructors.length === 0) ? (
+                <option value={instructorName}>{instructorName || "No Eligible Instructors Found"}</option>
+              ) : (
+                <>
+                  {instructorName && !instructors.some((i) => i.name === instructorName) && (
+                    <option value={instructorName}>{instructorName}</option>
+                  )}
+                  {instructors.map((inst) => (
+                    <option key={inst._id} value={inst.name}>
+                      {inst.name} ({inst.role.toUpperCase()})
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
           <p className="text-[11px] text-text-muted mt-1">

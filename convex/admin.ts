@@ -223,16 +223,8 @@ export const getAllStudents = query({
 
     try {
       const allUsers = await ctx.db.query("users").order("desc").collect();
-      const allEnrollments = await ctx.db.query("enrollments").collect();
-
-      const enrolledUserIds = new Set(allEnrollments.map((e) => e.userId.toString()));
       const studentsRaw = allUsers.filter(
-        (u) =>
-          u.accountStatus !== "archived" && 
-          (enrolledUserIds.has(u._id.toString()) ||
-          u.role === "student" ||
-          u.role === "user" ||
-          (u.role !== "admin" && u.role !== "instructor"))
+        (u) => u.accountStatus !== "archived"
       );
 
       return await Promise.all(
@@ -300,6 +292,35 @@ export const getAllStudents = query({
       console.error("[getAllStudents] error:", err);
       return [];
     }
+  },
+});
+
+export const getEligibleInstructors = query({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      await requireAdminOrInstructor(ctx);
+    } catch {
+      return [];
+    }
+
+    const allUsers = await ctx.db.query("users").collect();
+    const eligible = allUsers.filter((u) => {
+      if (u.accountStatus === "archived") return false;
+      const role = u.role?.toLowerCase() || "";
+      if (role === "instructor" || role === "admin" || role === "superadmin" || role === "staff") {
+        return true;
+      }
+      return Array.isArray(u.permissions) && u.permissions.includes("courses:write");
+    });
+
+    return eligible.map((u) => ({
+      _id: u._id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      avatarUrl: u.avatarUrl,
+    }));
   },
 });
 
@@ -2038,7 +2059,7 @@ export const getBatchSettingsExtended = query({
         course.description ||
         "Production-ready intensive AI & modern web development curriculum.",
       instructorName:
-        batch.instructorName || course.instructorName || "Marcus Krenn",
+        batch.instructorName || course.instructorName || "Unassigned",
       timezone: batch.timezone || "Asia/Kolkata (GMT+5:30)",
       enrollmentStatus:
         batch.enrollmentStatus ||

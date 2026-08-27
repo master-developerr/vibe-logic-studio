@@ -15,6 +15,7 @@ import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { PromoteRoleModal } from "@/components/admin/PromoteRoleModal";
 import { MessageStudentModal } from "@/components/admin/MessageStudentModal";
 import { StudentDrawer, DrawerStudentRow } from "@/components/admin/students/drawer";
+import { AdminPermissionGuard } from "@/components/admin/AdminPermissionGuard";
 
 import {
   Users,
@@ -621,7 +622,8 @@ export default function AdminStudentsPage() {
      RENDER
   ══════════════════════════════════════════════ */
   return (
-    <div className="flex flex-col gap-6 pb-12">
+    <AdminPermissionGuard permission="users:write">
+      <div className="flex flex-col gap-6 pb-12">
 
       {/* ── Page Header ──────────────────────────── */}
       <AdminPageHeader
@@ -1047,5 +1049,6 @@ export default function AdminStudentsPage() {
         submitting={removing}
       />
     </div>
+    </AdminPermissionGuard>
   );
 }

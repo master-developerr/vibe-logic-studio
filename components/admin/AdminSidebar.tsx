@@ -16,38 +16,54 @@ import {
   BarChart3,
   LogOut,
 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { hasPermission, GranularPermission } from "@/lib/permissions";
 import { UserButton, useUser } from "@clerk/nextjs";
 
 /* ─────────────────────────────────────────
-   Navigation map — grouped by section
+   Navigation map — grouped by section with permission mappings
 ───────────────────────────────────────── */
-const navGroups = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  exact?: boolean;
+  permission?: GranularPermission;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
   {
     label: "MAIN",
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-      { href: "/admin/courses",   label: "Courses",   icon: BookOpen },
-      { href: "/admin/batches",   label: "Batches",   icon: Layers },
-      { href: "/admin/students",  label: "Students",  icon: Users },
+      { href: "/admin/courses",   label: "Courses",   icon: BookOpen, permission: "courses:write" },
+      { href: "/admin/batches",   label: "Batches",   icon: Layers, permission: "courses:write" },
+      { href: "/admin/students",  label: "Students",  icon: Users, permission: "users:write" },
     ],
   },
   {
     label: "FINANCIALS",
     items: [
-      { href: "/admin/payments",  label: "Payments",  icon: CreditCard },
-      { href: "/admin/reviews",   label: "Reviews",   icon: Star },
+      { href: "/admin/payments",  label: "Payments",  icon: CreditCard, permission: "payments:read" },
+      { href: "/admin/reviews",   label: "Reviews",   icon: Star, permission: "courses:write" },
     ],
   },
   {
     label: "MARKETING",
     items: [
-      { href: "/admin/announcements", label: "Announcements",    icon: Megaphone },
+      { href: "/admin/announcements", label: "Announcements", icon: Megaphone, permission: "courses:write" },
     ],
   },
   {
     label: "SYSTEM",
     items: [
-      { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/admin/analytics", label: "Analytics", icon: BarChart3, permission: "settings:write" },
     ],
   },
 ];
@@ -55,6 +71,21 @@ const navGroups = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const { user } = useUser();
+  const dbUser = useQuery(
+    api.users.getUserByClerkId,
+    user?.id ? { clerkId: user.id } : "skip"
+  );
+
+  const filteredNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (!item.permission) return true;
+        if (dbUser === undefined) return true; // Show optimistically while loading
+        return hasPermission(dbUser, item.permission);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <aside className="w-[200px] min-w-[200px] h-screen border-r border-border bg-surface flex flex-col overflow-hidden">
@@ -73,14 +104,14 @@ export function AdminSidebar() {
             VibeLogic
           </span>
           <span className="block text-[10px] font-semibold text-text-muted mt-0.5 uppercase tracking-widest">
-            Admin
+            {dbUser?.role ? dbUser.role.toUpperCase() : "Admin"}
           </span>
         </div>
       </Link>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
-        {navGroups.map((group) => (
+        {filteredNavGroups.map((group) => (
           <div key={group.label}>
             <p className="text-[10px] font-semibold tracking-widest text-text-muted uppercase px-2 mb-1.5">
               {group.label}

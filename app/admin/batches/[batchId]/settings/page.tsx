@@ -27,6 +27,7 @@ export default function BatchSettingsPage() {
 
   // 1. UNCONDITIONAL CONVEX HOOKS (Strict React Rules of Hooks)
   const queryData = useQuery(api.admin.getBatchSettingsExtended, { batchId });
+  const instructors = useQuery(api.admin.getEligibleInstructors);
   const updateSettings = useMutation(api.admin.updateBatchSettingsExtended);
   const archiveBatch = useMutation(api.admin.archiveBatchExtended);
   const duplicateBatch = useMutation(api.admin.duplicateBatchExtended);
@@ -36,7 +37,7 @@ export default function BatchSettingsPage() {
   const [formState, setFormState] = useState({
     title: "",
     description: "",
-    instructorName: "Marcus Krenn",
+    instructorName: "",
     timezone: "Asia/Kolkata (GMT+5:30)",
     startDate: "",
     endDate: "",
@@ -79,7 +80,7 @@ export default function BatchSettingsPage() {
     setFormState({
       title: s.title || "",
       description: s.description || "",
-      instructorName: s.instructorName || "Marcus Krenn",
+      instructorName: s.instructorName || "",
       timezone: s.timezone || "Asia/Kolkata (GMT+5:30)",
       startDate: formatDate(s.startDate),
       endDate: formatDate(s.endDate),
@@ -276,6 +277,7 @@ export default function BatchSettingsPage() {
         status={formState.status}
         courseTitle={settings.courseTitle}
         courseSlug={settings.courseSlug}
+        instructors={instructors || []}
         onChange={handleFieldChange}
       />
 

@@ -5,6 +5,7 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopNav } from "@/components/admin/AdminTopNav";
+import { hasAdminAccess } from "@/lib/permissions";
 
 /**
  * AdminLayout — root layout for every /admin/* route.
@@ -35,7 +36,7 @@ export default async function AdminLayout({
     { clerkId: userId },
     { token }
   );
-  if (!user || user.role !== "admin") redirect("/dashboard");
+  if (!user || !hasAdminAccess(user)) redirect("/dashboard");
 
   /* ── Shell ─────────────────────────────────────────── */
   return (

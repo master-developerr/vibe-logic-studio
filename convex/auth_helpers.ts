@@ -43,3 +43,31 @@ export async function requireAdmin(ctx: Context) {
   
   return authUser;
 }
+
+/**
+ * Validates that the current request is authenticated and the user has a specific granular permission
+ * or implicit role capability.
+ */
+export async function requirePermission(ctx: Context, permission: string) {
+  const authUser = await requireAdminOrInstructor(ctx);
+
+  if (authUser.role === "admin" || authUser.role === "superadmin") {
+    return authUser;
+  }
+
+  if (Array.isArray(authUser.permissions) && authUser.permissions.includes(permission)) {
+    return authUser;
+  }
+
+  if (!authUser.permissions || authUser.permissions.length === 0) {
+    if (authUser.role === "instructor" && permission === "courses:write") {
+      return authUser;
+    }
+    if (authUser.role === "staff" && (permission === "users:write" || permission === "courses:write")) {
+      return authUser;
+    }
+  }
+
+  throw new Error(`Unauthorized: Missing required permission standard [${permission}]`);
+}
+

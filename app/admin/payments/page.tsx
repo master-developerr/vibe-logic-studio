@@ -1,5 +1,6 @@
 import React from "react";
 import { PaymentsClient } from "@/components/admin/payments/PaymentsClient";
+import { AdminPermissionGuard } from "@/components/admin/AdminPermissionGuard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -11,7 +12,9 @@ export const metadata: Metadata = {
 export default function AdminPaymentsPage() {
   return (
     <div className="w-full">
-      <PaymentsClient />
+      <AdminPermissionGuard permission="payments:read">
+        <PaymentsClient />
+      </AdminPermissionGuard>
     </div>
   );
 }
