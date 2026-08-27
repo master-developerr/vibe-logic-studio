@@ -7,31 +7,14 @@ import {
   Megaphone,
   Plus,
   Search,
-  Filter,
-  Users,
-  Eye,
-  MessageSquare,
   Pin,
-  Archive,
   Trash2,
   Copy,
   Calendar,
-  Clock,
-  Send,
-  Share2,
   Paperclip,
-  TrendingUp,
-  CheckCircle2,
-  AlertCircle,
-  BarChart3,
   Smartphone,
-  Mail,
-  Bell,
-  Sparkles,
-  FileText,
   ExternalLink,
   Save,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +40,7 @@ export default function BatchAnnouncementsPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [audienceFilter, setAudienceFilter] = useState("ALL");
-  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "readRate">("newest");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
 
   // Modals & Drawers state
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<ExtendedAnnouncementItem | null>(null);
@@ -141,10 +124,6 @@ export default function BatchAnnouncementsPage({
     () =>
       serverAudienceCounts || {
         "Entire Batch": workspace?.batch?.enrolledCount || 0,
-        "Specific Students": workspace?.batch?.enrolledCount || 0,
-        "Students with Pending Payments": 0,
-        "Students with Low Attendance": 0,
-        "Students Missing Assignments": 0,
         "Instructors": 1,
       },
     [serverAudienceCounts, workspace]
@@ -191,12 +170,8 @@ export default function BatchAnnouncementsPage({
 
       if (sortBy === "newest") {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      } else if (sortBy === "oldest") {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       } else {
-        const rateA = a.engagement.deliveredCount > 0 ? a.engagement.views / a.engagement.deliveredCount : 0;
-        const rateB = b.engagement.deliveredCount > 0 ? b.engagement.views / b.engagement.deliveredCount : 0;
-        return rateB - rateA;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       }
     });
 
@@ -426,503 +401,304 @@ export default function BatchAnnouncementsPage({
         </div>
       </div>
 
-      {/* 3. Main 2-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (8 cols): Composer, Filter Bar, and Announcements Feed */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Expandable Composer */}
-          {showComposer && (
-            <BatchAnnouncementComposer
-              batchId={batchId}
-              batchTitle={batchTitle}
-              audienceCounts={audienceCounts}
-              onPublish={handlePublishAnnouncement}
-              onOpenAttachmentModal={() => setIsAttachmentModalOpen(true)}
-              onOpenPreview={(data) => {
-                setPreviewData(data);
-                setIsPreviewOpen(true);
-              }}
-              attachments={composerAttachments}
-              onRemoveAttachment={(idx) =>
-                setComposerAttachments((prev) => prev.filter((_, i) => i !== idx))
-              }
-            />
-          )}
+      {/* 3. Single-Column Clean Workspace (Full Width) */}
+      <div className="space-y-6">
+        {/* Expandable Composer */}
+        {showComposer && (
+          <BatchAnnouncementComposer
+            batchId={batchId}
+            batchTitle={batchTitle}
+            audienceCounts={audienceCounts}
+            onPublish={handlePublishAnnouncement}
+            onOpenAttachmentModal={() => setIsAttachmentModalOpen(true)}
+            onOpenPreview={(data) => {
+              setPreviewData(data);
+              setIsPreviewOpen(true);
+            }}
+            attachments={composerAttachments}
+            onRemoveAttachment={(idx) =>
+              setComposerAttachments((prev) => prev.filter((_, i) => i !== idx))
+            }
+          />
+        )}
 
-          {/* Search, Status Filter, Audience Filter & Sorting Bar */}
-          <div className="bg-surface border border-border rounded-2xl p-4 shadow-sm space-y-3">
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-3" />
-                <Input
-                  placeholder="Search announcements by title, keyword, or author..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-10 bg-background text-xs text-text-primary"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="Published">Published</option>
-                  <option value="Scheduled">Scheduled</option>
-                  <option value="Draft">Drafts</option>
-                  <option value="Pinned">Pinned Only</option>
-                </select>
-
-                <select
-                  value={audienceFilter}
-                  onChange={(e) => setAudienceFilter(e.target.value)}
-                  className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="ALL">All Audiences</option>
-                  <option value="Entire Batch">Entire Batch</option>
-                  <option value="Specific Students">Specific Students</option>
-                  <option value="Students with Pending Payments">Pending Payments</option>
-                  <option value="Students with Low Attendance">Low Attendance</option>
-                </select>
-
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                </select>
-              </div>
+        {/* Search, Status Filter, Audience Filter & Sorting Bar */}
+        <div className="bg-surface border border-border rounded-2xl p-4 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-3" />
+              <Input
+                placeholder="Search announcements by title, keyword, or author..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-10 bg-background text-xs text-text-primary"
+              />
             </div>
-          </div>
 
-          {/* Announcements Feed List */}
-          <div className="space-y-4">
-            {filteredAnnouncements.length === 0 ? (
-              <div className="py-16 text-center bg-surface border border-dashed border-border rounded-2xl p-8">
-                <Megaphone className="w-12 h-12 mx-auto text-text-muted mb-3 opacity-40" />
-                {isFiltersActive ? (
-                  <>
-                    <h3 className="font-bold text-base text-text-primary">No announcements match your filters</h3>
-                    <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-                      Try adjusting your search keywords, status filter, or audience criteria.
-                    </p>
-                    <Button
-                      onClick={() => {
-                        setSearchQuery("");
-                        setStatusFilter("ALL");
-                        setAudienceFilter("ALL");
-                      }}
-                      variant="outline"
-                      size="sm"
-                      className="mt-4 text-xs font-semibold"
-                    >
-                      Clear Filters
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="font-bold text-base text-text-primary">No announcements yet</h3>
-                    <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-                      Create an announcement to communicate with your cohort.
-                    </p>
-                    <Button
-                      onClick={() => setShowComposer(true)}
-                      size="sm"
-                      className="mt-4 text-xs font-bold gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Create Announcement</span>
-                    </Button>
-                  </>
-                )}
-              </div>
-            ) : (
-              filteredAnnouncements.map((ann) => {
-                const isPinnedCard = ann.isPinned || ann.status === "Pinned";
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="Published">Published</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Draft">Drafts</option>
+                <option value="Pinned">Pinned Only</option>
+              </select>
 
-                return (
-                  <div
-                    key={ann.id}
-                    className={`bg-surface border rounded-2xl overflow-hidden transition-all shadow-sm hover:shadow-md ${
-                      isPinnedCard ? "border-amber-500/40 bg-amber-500/[0.02]" : "border-border"
-                    }`}
-                  >
-                    {/* Pinned Header Strip */}
-                    {isPinnedCard && (
-                      <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-1.5 flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-400">
-                        <div className="flex items-center gap-1.5">
-                          <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                          <span>Pinned to top of cohort feed</span>
-                        </div>
-                        <span className="text-[10px] uppercase font-semibold">Priority Notice</span>
-                      </div>
-                    )}
+              <select
+                value={audienceFilter}
+                onChange={(e) => setAudienceFilter(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="ALL">All Audiences</option>
+                <option value="Entire Batch">Entire Batch</option>
+                <option value="Instructors">Instructors Only</option>
+              </select>
 
-                    <div className="p-6 space-y-4">
-                      {/* Top Author + Badges Row */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">
-                            {ann.authorName.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-text-primary">
-                                {ann.authorName}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-md bg-background border border-border text-[10px] font-semibold text-text-muted">
-                                {ann.authorRole}
-                              </span>
-                            </div>
-                            <p className="text-xs text-text-muted mt-0.5">
-                              {new Date(ann.createdAt).toLocaleDateString("en-IN", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Status & Audience Badges */}
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                              ann.status === "Scheduled"
-                                ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
-                                : ann.status === "Draft"
-                                ? "bg-slate-500/10 text-slate-600 border border-slate-500/20"
-                                : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                            }`}
-                          >
-                            {ann.status}
-                          </span>
-                          <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                            {ann.targetAudience}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Headline & Body Text */}
-                      <div
-                        className="space-y-2 cursor-pointer group"
-                        onClick={() => {
-                          setSelectedAnnouncement(ann);
-                          setIsDrawerOpen(true);
-                        }}
-                      >
-                        <h2 className="font-bold text-base text-text-primary group-hover:text-primary transition-colors">
-                          {ann.title}
-                        </h2>
-                        <p className="text-sm text-text-secondary leading-relaxed line-clamp-3 whitespace-pre-line">
-                          {ann.content}
-                        </p>
-                      </div>
-
-                      {/* Attachments Chips */}
-                      {ann.attachments && ann.attachments.length > 0 && (
-                        <div className="flex items-center gap-2 flex-wrap pt-1">
-                          {ann.attachments.map((att, idx) => (
-                            <a
-                              key={idx}
-                              href={att.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background border border-border hover:border-primary/40 text-xs font-semibold text-text-primary transition-all group"
-                            >
-                              <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
-                              <span className="group-hover:text-primary transition-colors">
-                                {att.title}
-                              </span>
-                              <ExternalLink className="w-3 h-3 text-text-muted ml-1" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Footer Toolbar: Action Buttons */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/60">
-                        <div className="flex items-center gap-3 text-xs text-text-muted">
-                          <span>Audience: <strong className="text-text-primary">{ann.targetAudience}</strong></span>
-                        </div>
-
-                        {/* Right Action Buttons */}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedAnnouncement(ann);
-                              setIsDrawerOpen(true);
-                            }}
-                            className="text-xs h-8 px-3 font-semibold"
-                          >
-                            Inspect Details
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setPreviewData({
-                                title: ann.title,
-                                content: ann.content,
-                                targetAudience: ann.targetAudience,
-                                isPinned: ann.isPinned,
-                                allowComments: ann.allowComments,
-                                attachments: ann.attachments,
-                              });
-                              setIsPreviewOpen(true);
-                            }}
-                            className="text-xs h-8 px-2.5 font-semibold gap-1"
-                            title="Preview student view"
-                          >
-                            <Smartphone className="w-3.5 h-3.5" />
-                            <span>Preview</span>
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleTogglePin(ann.id, !ann.isPinned)}
-                            className="text-xs h-8 px-2"
-                            title={ann.isPinned ? "Unpin Announcement" : "Pin Announcement"}
-                          >
-                            <Pin
-                              className={`w-3.5 h-3.5 ${
-                                ann.isPinned ? "text-amber-500 fill-amber-500" : ""
-                              }`}
-                            />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDuplicate(ann.id)}
-                            className="text-xs h-8 px-2"
-                            title="Duplicate Announcement"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(ann.id)}
-                            className="text-xs h-8 px-2 text-text-muted hover:text-red-600"
-                            title="Delete Announcement"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="h-10 px-3 rounded-lg border border-border bg-background text-xs font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Right Sidebar (4 cols): Broadcast Channels & Audience Reach Breakdown */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Card 1: Genuine Broadcast Channels Integration Status */}
-          <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-border/60">
-              <h3 className="font-bold text-sm text-text-primary flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-primary" />
-                Broadcast Channels
-              </h3>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-                1 Active
-              </span>
+        {/* Announcements Feed List */}
+        <div className="space-y-4">
+          {filteredAnnouncements.length === 0 ? (
+            <div className="py-16 text-center bg-surface border border-dashed border-border rounded-2xl p-8">
+              <Megaphone className="w-12 h-12 mx-auto text-text-muted mb-3 opacity-40" />
+              {isFiltersActive ? (
+                <>
+                  <h3 className="font-bold text-base text-text-primary">No announcements match your filters</h3>
+                  <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+                    Try adjusting your search keywords or status filter.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("ALL");
+                      setAudienceFilter("ALL");
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 text-xs font-semibold"
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-bold text-base text-text-primary">No announcements yet</h3>
+                  <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+                    Create an announcement to communicate with your cohort.
+                  </p>
+                  <Button
+                    onClick={() => setShowComposer(true)}
+                    size="sm"
+                    className="mt-4 text-xs font-bold gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create Announcement</span>
+                  </Button>
+                </>
+              )}
             </div>
+          ) : (
+            filteredAnnouncements.map((ann) => {
+              const isPinnedCard = ann.isPinned || ann.status === "Pinned";
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Bell className="w-4 h-4 text-emerald-600" />
-                  <div>
-                    <span className="font-bold text-text-primary block">In-App Dashboard Feed</span>
-                    <span className="text-[10px] text-text-muted">Convex Real-Time Sync</span>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold">
-                  Active
-                </span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Smartphone className="w-4 h-4 text-text-muted" />
-                  <div>
-                    <span className="font-bold text-text-primary block">WhatsApp Community</span>
-                    <span className="text-[10px] text-text-muted">
-                      {activeBatch?.whatsappLink ? "Group Link Configured" : "Batch Group Link"}
-                    </span>
-                  </div>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    activeBatch?.whatsappLink
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : "bg-slate-500/10 text-slate-500"
+              return (
+                <div
+                  key={ann.id}
+                  className={`bg-surface border rounded-2xl overflow-hidden transition-all shadow-sm hover:shadow-md ${
+                    isPinnedCard ? "border-amber-500/40 bg-amber-500/[0.02]" : "border-border"
                   }`}
                 >
-                  {activeBatch?.whatsappLink ? "Configured" : "Not Configured"}
-                </span>
-              </div>
+                  {/* Pinned Header Strip */}
+                  {isPinnedCard && (
+                    <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-1.5 flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-400">
+                      <div className="flex items-center gap-1.5">
+                        <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                        <span>Pinned to top of cohort feed</span>
+                      </div>
+                      <span className="text-[10px] uppercase font-semibold">Priority Notice</span>
+                    </div>
+                  )}
 
-              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Mail className="w-4 h-4 text-text-muted" />
-                  <div>
-                    <span className="font-bold text-text-primary block">Email Notifications</span>
-                    <span className="text-[10px] text-text-muted">SMTP / Resend Integration</span>
+                  <div className="p-6 space-y-4">
+                    {/* Top Author + Badges Row */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xs text-primary">
+                          {ann.authorName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-text-primary">
+                              {ann.authorName}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-background border border-border text-[10px] font-semibold text-text-muted">
+                              {ann.authorRole}
+                            </span>
+                          </div>
+                          <p className="text-xs text-text-muted mt-0.5">
+                            {new Date(ann.createdAt).toLocaleDateString("en-IN", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status & Audience Badges */}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                            ann.status === "Scheduled"
+                              ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                              : ann.status === "Draft"
+                              ? "bg-slate-500/10 text-slate-600 border border-slate-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                          }`}
+                        >
+                          {ann.status}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                          {ann.targetAudience}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Headline & Body Text */}
+                    <div
+                      className="space-y-2 cursor-pointer group"
+                      onClick={() => {
+                        setSelectedAnnouncement(ann);
+                        setIsDrawerOpen(true);
+                      }}
+                    >
+                      <h2 className="font-bold text-base text-text-primary group-hover:text-primary transition-colors">
+                        {ann.title}
+                      </h2>
+                      <p className="text-sm text-text-secondary leading-relaxed line-clamp-3 whitespace-pre-line">
+                        {ann.content}
+                      </p>
+                    </div>
+
+                    {/* Attachments Chips */}
+                    {ann.attachments && ann.attachments.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {ann.attachments.map((att, idx) => (
+                          <a
+                            key={idx}
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background border border-border hover:border-primary/40 text-xs font-semibold text-text-primary transition-all group"
+                          >
+                            <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="group-hover:text-primary transition-colors">
+                              {att.title}
+                            </span>
+                            <ExternalLink className="w-3 h-3 text-text-muted ml-1" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Footer Toolbar: Action Buttons */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border/60">
+                      <div className="flex items-center gap-3 text-xs text-text-muted">
+                        <span>Target Audience: <strong className="text-text-primary font-semibold">{ann.targetAudience}</strong></span>
+                      </div>
+
+                      {/* Right Action Buttons */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAnnouncement(ann);
+                            setIsDrawerOpen(true);
+                          }}
+                          className="text-xs h-8 px-3 font-semibold"
+                        >
+                          Inspect Details
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPreviewData({
+                              title: ann.title,
+                              content: ann.content,
+                              targetAudience: ann.targetAudience,
+                              isPinned: ann.isPinned,
+                              allowComments: ann.allowComments,
+                              attachments: ann.attachments,
+                            });
+                            setIsPreviewOpen(true);
+                          }}
+                          className="text-xs h-8 px-2.5 font-semibold gap-1"
+                          title="Preview student view"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>Preview</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTogglePin(ann.id, !ann.isPinned)}
+                          className="text-xs h-8 px-2"
+                          title={ann.isPinned ? "Unpin Announcement" : "Pin Announcement"}
+                        >
+                          <Pin
+                            className={`w-3.5 h-3.5 ${
+                              ann.isPinned ? "text-amber-500 fill-amber-500" : ""
+                            }`}
+                          />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDuplicate(ann.id)}
+                          className="text-xs h-8 px-2"
+                          title="Duplicate Announcement"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(ann.id)}
+                          className="text-xs h-8 px-2 text-text-muted hover:text-red-600"
+                          title="Delete Announcement"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-slate-500/10 text-slate-500 text-[10px] font-bold">
-                  Not Configured
-                </span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-background border border-border flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Sparkles className="w-4 h-4 text-text-muted" />
-                  <div>
-                    <span className="font-bold text-text-primary block">Mobile Push Queue</span>
-                    <span className="text-[10px] text-text-muted">Expo Push Notifications</span>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-slate-500/10 text-slate-500 text-[10px] font-bold">
-                  Not Configured
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Audience Segment Reach (Calculated from Real DB Enrollments) */}
-          <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-text-primary flex items-center gap-2 pb-2 border-b border-border/60">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              Audience Segment Reach
-            </h3>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-text-secondary">Entire Batch (All Learners)</span>
-                  <span className="font-bold text-text-primary">
-                    {audienceCounts["Entire Batch"] || 0} learners
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full"
-                    style={{
-                      width: audienceCounts["Entire Batch"] > 0 ? "100%" : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-text-secondary">Pending Fee Installments</span>
-                  <span className="font-bold text-text-primary">
-                    {audienceCounts["Students with Pending Payments"] || 0} learners
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div
-                    className="h-full bg-amber-500 rounded-full"
-                    style={{
-                      width:
-                        audienceCounts["Entire Batch"] > 0
-                          ? `${Math.round(
-                              ((audienceCounts["Students with Pending Payments"] || 0) /
-                                audienceCounts["Entire Batch"]) *
-                                100
-                            )}%`
-                          : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-text-secondary">Low Attendance (&lt; 75%)</span>
-                  <span className="font-bold text-text-primary">
-                    {audienceCounts["Students with Low Attendance"] || 0} learners
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div
-                    className="h-full bg-red-500 rounded-full"
-                    style={{
-                      width:
-                        audienceCounts["Entire Batch"] > 0
-                          ? `${Math.round(
-                              ((audienceCounts["Students with Low Attendance"] || 0) /
-                                audienceCounts["Entire Batch"]) *
-                                100
-                            )}%`
-                          : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-text-secondary">Missing Assignments</span>
-                  <span className="font-bold text-text-primary">
-                    {audienceCounts["Students Missing Assignments"] || 0} learners
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-background overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full"
-                    style={{
-                      width:
-                        audienceCounts["Entire Batch"] > 0
-                          ? `${Math.round(
-                              ((audienceCounts["Students Missing Assignments"] || 0) /
-                                audienceCounts["Entire Batch"]) *
-                                100
-                            )}%`
-                          : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: AI Engagement Insights (State when no data) */}
-          <div className="bg-gradient-to-br from-primary/5 via-surface to-surface border border-primary/20 rounded-2xl p-6 shadow-sm space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <h3 className="font-bold text-sm text-text-primary">
-                AI Engagement Insights
-              </h3>
-            </div>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              {totalCount > 0
-                ? `Active broadcast engine currently syncing ${totalCount} announcement${
-                    totalCount > 1 ? "s" : ""
-                  } across ${batchTitle} learners.`
-                : "Engagement & timing insights will appear once announcements have been broadcasted to cohort learners."}
-            </p>
-          </div>
+              );
+            })
+          )}
         </div>
       </div>
 
