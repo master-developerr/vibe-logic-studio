@@ -58,14 +58,24 @@ async function requireCurrentUser(ctx: MutationCtx) {
 async function findActiveEnrollment(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
-  courseId: Id<"courses">
+  args: CourseBatchArgs
 ) {
+  const exact = await ctx.db
+    .query("enrollments")
+    .withIndex("by_user_course_batch", (q) =>
+      q.eq("userId", userId).eq("courseId", args.courseId).eq("batchId", args.batchId)
+    )
+    .filter((q) => q.eq(q.field("status"), "active"))
+    .first();
+
+  if (exact) return exact;
+
   const enrollments = await ctx.db
     .query("enrollments")
     .withIndex("by_user_id", (q) => q.eq("userId", userId))
     .filter((q) =>
       q.and(
-        q.eq(q.field("courseId"), courseId),
+        q.eq(q.field("courseId"), args.courseId),
         q.eq(q.field("status"), "active")
       )
     )
@@ -217,7 +227,7 @@ export const getCheckoutStatus = query({
       .unique();
     if (!user) return null;
 
-    const enrollment = await findActiveEnrollment(ctx, user._id, args.courseId);
+    const enrollment = await findActiveEnrollment(ctx, user._id, args);
     if (enrollment) {
       return {
         hasActiveEnrollment: true,
