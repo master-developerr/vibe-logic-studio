@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   Calendar as CalendarIcon,
@@ -71,6 +71,9 @@ export function BatchCalendarWorkspace({
     batchId: batchId as any,
   });
   const eligibleInstructors = useQuery(api.admin.getEligibleInstructors);
+  const createRecMut = useMutation(api.admin.createBatchRecordingExtended);
+  const updateRecMut = useMutation(api.admin.updateBatchRecordingExtended);
+  const deleteRecMut = useMutation(api.admin.deleteBatchRecordingExtended);
 
   const leadInstructorDefault = batchSettingsData?.settings?.instructorName || "Instructor";
 
@@ -323,17 +326,46 @@ export function BatchCalendarWorkspace({
     setIsDrawerOpen(true);
   };
 
-  const handleSaveEvent = (updated: BatchCalendarEvent) => {
+  const handleSaveEvent = async (updated: BatchCalendarEvent) => {
     setEvents((prev) =>
       prev.map((e) => (e.id === updated.id ? updated : e))
     );
+
+    if (!updated.id.startsWith("evt-") && !updated.id.startsWith("mock-")) {
+      const startMs = new Date(`${updated.dateStr}T${updated.startTime}:00`).getTime();
+      const endMs = new Date(`${updated.dateStr}T${updated.endTime}:00`).getTime();
+
+      try {
+        await updateRecMut({
+          id: updated.id as any,
+          title: updated.title,
+          meetingLink: updated.meetingLink,
+          instructorName: updated.leadInstructor,
+          status: updated.publishStatus,
+          description: updated.description,
+          startTime: isNaN(startMs) ? undefined : startMs,
+          endTime: isNaN(endMs) ? undefined : endMs,
+          duration: `${updated.durationMins || 90} Mins`,
+        });
+      } catch (err) {
+        console.error("Failed to persist session update to Convex:", err);
+      }
+    }
   };
 
-  const handleDeleteEvent = (eventId: string) => {
+  const handleDeleteEvent = async (eventId: string) => {
     if (confirm("Remove this session from the cohort schedule?")) {
       setEvents((prev) => prev.filter((e) => e.id !== eventId));
       setIsDrawerOpen(false);
       setSelectedEvent(null);
+
+      if (!eventId.startsWith("evt-") && !eventId.startsWith("mock-")) {
+        try {
+          await deleteRecMut({ id: eventId as any });
+        } catch (err) {
+          console.error("Failed to delete session from Convex:", err);
+        }
+      }
     }
   };
 
@@ -348,18 +380,25 @@ export function BatchCalendarWorkspace({
     setSelectedEvent(dupe);
   };
 
-  const handleCreateNewEvent = (newEvent: Partial<BatchCalendarEvent>) => {
+  const handleCreateNewEvent = async (newEvent: Partial<BatchCalendarEvent>) => {
+    const dateStr = newEvent.dateStr || new Date().toISOString().slice(0, 10);
+    const startTimeStr = newEvent.startTime || "18:00";
+    const endTimeStr = newEvent.endTime || "19:30";
+
+    const startMs = new Date(`${dateStr}T${startTimeStr}:00`).getTime();
+    const endMs = new Date(`${dateStr}T${endTimeStr}:00`).getTime();
+
     const full: BatchCalendarEvent = {
       id: `evt-${Date.now()}`,
       title: newEvent.title || "Untitled Session",
       eventType: newEvent.eventType || "Live Class",
       description: newEvent.description || "",
-      dateStr: newEvent.dateStr || "2026-08-15",
-      startTime: newEvent.startTime || "18:00",
-      endTime: newEvent.endTime || "19:30",
+      dateStr,
+      startTime: startTimeStr,
+      endTime: endTimeStr,
       durationMins: newEvent.durationMins || 90,
       timezone: newEvent.timezone || "America/New_York (EST)",
-      leadInstructor: newEvent.leadInstructor || "Markus Keren",
+      leadInstructor: newEvent.leadInstructor || leadInstructorDefault,
       meetingLink:
         newEvent.meetingLink || "https://meet.google.com/vibe-logic-live",
       objectives: newEvent.objectives || [],
@@ -373,7 +412,26 @@ export function BatchCalendarWorkspace({
       colorCategory:
         EVENT_TYPE_COLORS[newEvent.eventType || "Live Class"].label,
     };
+
     setEvents((prev) => [...prev, full]);
+
+    if (!batchId.toString().startsWith("mock-") && !batchId.toString().startsWith("demo-")) {
+      try {
+        await createRecMut({
+          batchId: batchId as any,
+          title: newEvent.title || "Untitled Session",
+          meetingLink: newEvent.meetingLink || "https://meet.google.com/vibe-logic-live",
+          instructorName: newEvent.leadInstructor || leadInstructorDefault,
+          status: newEvent.publishStatus || "Published",
+          description: newEvent.description || "",
+          startTime: isNaN(startMs) ? Date.now() : startMs,
+          endTime: isNaN(endMs) ? Date.now() + 5400000 : endMs,
+          duration: `${newEvent.durationMins || 90} Mins`,
+        });
+      } catch (err) {
+        console.error("Failed to persist new session to Convex:", err);
+      }
+    }
   };
 
   const handleImportEvents = (imported: Partial<BatchCalendarEvent>[]) => {

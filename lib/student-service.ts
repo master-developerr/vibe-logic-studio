@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { redis, isDynamicServerError } from "./redis";
 import type { Id } from "@/convex/_generated/dataModel";
 
-const CACHE_TTL = 60 * 5; // 5 minutes for student dashboard to keep it fresh
+const CACHE_TTL = 10; // 10 seconds for real-time live class synchronization
 
 export async function getStudentDashboard(clerkId: string, token?: string): Promise<any> {
   const cacheKey = `student:dashboard:${clerkId}`;

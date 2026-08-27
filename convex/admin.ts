@@ -1636,7 +1636,10 @@ export const createBatchRecordingExtended = mutation({
   args: {
     batchId: v.id("batches"),
     title: v.string(),
-    recordingUrl: v.string(),
+    recordingUrl: v.optional(v.string()),
+    startTime: v.optional(v.number()),
+    endTime: v.optional(v.number()),
+    meetingLink: v.optional(v.string()),
     duration: v.optional(v.string()),
     moduleTitle: v.optional(v.string()),
     instructorName: v.optional(v.string()),
@@ -1658,18 +1661,22 @@ export const createBatchRecordingExtended = mutation({
   handler: async (ctx, args) => {
     await requireAdminOrInstructor(ctx);
 
-    const extractedYtId = args.youtubeVideoId || parseYouTubeIdServer(args.recordingUrl);
-    const finalUrl = extractedYtId ? `https://www.youtube.com/embed/${extractedYtId}` : args.recordingUrl;
+    const recordingUrl = args.recordingUrl || "";
+    const extractedYtId = args.youtubeVideoId || parseYouTubeIdServer(recordingUrl);
+    const finalUrl = extractedYtId ? `https://www.youtube.com/embed/${extractedYtId}` : recordingUrl;
     const finalSource = extractedYtId ? "YouTube" : (args.videoSource || "AWS S3");
 
     const batch = await ctx.db.get(args.batchId);
     const now = Date.now();
+    const startTime = args.startTime ?? (now - 3600000 * 2);
+    const endTime = args.endTime ?? now;
+
     const id = await ctx.db.insert("liveClasses", {
       batchId: args.batchId,
       title: args.title,
-      startTime: now - 3600000 * 2,
-      endTime: now,
-      meetingLink: "https://meet.google.com",
+      startTime,
+      endTime,
+      meetingLink: args.meetingLink || "https://meet.google.com/vibe-logic-live",
       recordingUrl: finalUrl,
       duration: args.duration || "01:45:00",
       moduleTitle: args.moduleTitle || "Module 1",
@@ -1692,6 +1699,9 @@ export const updateBatchRecordingExtended = mutation({
     id: v.id("liveClasses"),
     title: v.optional(v.string()),
     recordingUrl: v.optional(v.string()),
+    startTime: v.optional(v.number()),
+    endTime: v.optional(v.number()),
+    meetingLink: v.optional(v.string()),
     duration: v.optional(v.string()),
     moduleTitle: v.optional(v.string()),
     instructorName: v.optional(v.string()),
@@ -1718,6 +1728,9 @@ export const updateBatchRecordingExtended = mutation({
 
     const updates: Record<string, any> = {};
     if (args.title !== undefined) updates.title = args.title;
+    if (args.startTime !== undefined) updates.startTime = args.startTime;
+    if (args.endTime !== undefined) updates.endTime = args.endTime;
+    if (args.meetingLink !== undefined) updates.meetingLink = args.meetingLink;
     if (args.recordingUrl !== undefined) {
       const extractedYtId = args.youtubeVideoId || parseYouTubeIdServer(args.recordingUrl);
       if (extractedYtId) {
