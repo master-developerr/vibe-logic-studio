@@ -160,7 +160,7 @@ export function BatchSelectorPremium({ batches, price, courseSlug }: BatchSelect
               href={
                 isSignedIn
                   ? `/checkout?courseSlug=${courseSlug}&batchId=${selectedBatchId}`
-                  : `/sign-up?fallback_redirect_url=${encodeURIComponent(
+                  : `/sign-up?redirect_url=${encodeURIComponent(
                       `/checkout?courseSlug=${courseSlug}&batchId=${selectedBatchId}`
                     )}`
               }

@@ -54,9 +54,9 @@ export default async function CheckoutPage({
   };
 
   if (!userId) {
-    // If not authenticated, redirect to sign-up and redirect back to this checkout URL
+    // If not authenticated, redirect to sign-up and force redirect back to this checkout URL
     const redirectUrl = encodeURIComponent(`/checkout?courseSlug=${course.slug}&batchId=${batchId}`);
-    redirect(`/sign-up?fallback_redirect_url=${redirectUrl}`);
+    redirect(`/sign-up?redirect_url=${redirectUrl}`);
   }
 
   return (
