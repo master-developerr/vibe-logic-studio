@@ -331,7 +331,7 @@ export function CourseRecordingsClient({ batchId, clerkId }: CourseRecordingsCli
                     )}
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 opacity-60" />
-                      {new Date(rec.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      {new Date(rec.startTime || Date.now()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
                     {rec.instructorName && (
                       <span className="flex items-center gap-1.5">

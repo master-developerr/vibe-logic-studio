@@ -835,13 +835,20 @@ export const createLiveClass = mutation({
   handler: async (ctx, args) => {
     await requireAdminOrInstructor(ctx);
 
+    const recordingUrl = args.recordingUrl || "";
+    const extractedYtId = parseYouTubeIdServer(recordingUrl);
+    const finalUrl = extractedYtId ? `https://www.youtube.com/embed/${extractedYtId}` : (args.recordingUrl || undefined);
+    const finalSource = extractedYtId ? "YouTube" : undefined;
+
     return await ctx.db.insert("liveClasses", {
       batchId: args.batchId,
       title: args.title,
       startTime: args.startTime,
       endTime: args.endTime,
       meetingLink: args.meetingLink,
-      recordingUrl: args.recordingUrl,
+      recordingUrl: finalUrl,
+      youtubeVideoId: extractedYtId,
+      videoSource: finalSource,
     });
   },
 });
@@ -1630,10 +1637,46 @@ export const getBatchRecordingsExtended = query({
 function parseYouTubeIdServer(url: string | undefined): string | undefined {
   if (!url) return undefined;
   const trimmed = url.trim();
+  if (!trimmed) return undefined;
+
+  // 1. Raw 11-char ID
   if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
-  const regex = /(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-  const match = trimmed.match(regex);
-  return match ? match[1] : undefined;
+
+  // 2. Iframe snippet support
+  const iframeMatch = trimmed.match(/src=["']([^"']+)["']/i);
+  const target = iframeMatch ? iframeMatch[1] : trimmed;
+
+  // 3. URL object parse
+  try {
+    const urlString = target.match(/^https?:\/\//i) ? target : `https://${target}`;
+    const parsed = new URL(urlString);
+    const host = parsed.hostname.toLowerCase();
+
+    if (host === "youtu.be" || host.endsWith(".youtu.be")) {
+      const seg = parsed.pathname.replace(/^\/+/, "").split("/")[0];
+      if (seg && /^[a-zA-Z0-9_-]{11}$/.test(seg)) return seg;
+    }
+
+    if (host.includes("youtube.com") || host.includes("youtube-nocookie.com")) {
+      const v = parsed.searchParams.get("v");
+      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+
+      const match = parsed.pathname.match(/^\/(?:embed|shorts|live|v|e|watch)\/([a-zA-Z0-9_-]{11})/i);
+      if (match && match[1]) return match[1];
+
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      for (const p of parts) {
+        if (/^[a-zA-Z0-9_-]{11}$/.test(p) && !["watch", "embed", "shorts", "live", "v", "e"].includes(p.toLowerCase())) {
+          return p;
+        }
+      }
+    }
+  } catch {}
+
+  // 4. Regex fallback
+  const regex = /(?:youtube(?:-nocookie)?\.com\/(?:(?:v|e(?:mbed)?|shorts|live)\/|(?:watch\/?\?(?:.*&)?v=)|(?:watch\/))|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+  const match = target.match(regex);
+  return match && match[1] ? match[1] : undefined;
 }
 
 export const createBatchRecordingExtended = mutation({

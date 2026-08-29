@@ -366,9 +366,49 @@ export const getCertificatesData = query({
   }
 });
 
+function parseYouTubeIdServer(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+
+  const iframeMatch = trimmed.match(/src=["']([^"']+)["']/i);
+  const target = iframeMatch ? iframeMatch[1] : trimmed;
+
+  try {
+    const urlString = target.match(/^https?:\/\//i) ? target : `https://${target}`;
+    const parsed = new URL(urlString);
+    const host = parsed.hostname.toLowerCase();
+
+    if (host === "youtu.be" || host.endsWith(".youtu.be")) {
+      const seg = parsed.pathname.replace(/^\/+/, "").split("/")[0];
+      if (seg && /^[a-zA-Z0-9_-]{11}$/.test(seg)) return seg;
+    }
+
+    if (host.includes("youtube.com") || host.includes("youtube-nocookie.com")) {
+      const v = parsed.searchParams.get("v");
+      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+
+      const match = parsed.pathname.match(/^\/(?:embed|shorts|live|v|e|watch)\/([a-zA-Z0-9_-]{11})/i);
+      if (match && match[1]) return match[1];
+
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      for (const p of parts) {
+        if (/^[a-zA-Z0-9_-]{11}$/.test(p) && !["watch", "embed", "shorts", "live", "v", "e"].includes(p.toLowerCase())) {
+          return p;
+        }
+      }
+    }
+  } catch {}
+
+  const regex = /(?:youtube(?:-nocookie)?\.com\/(?:(?:v|e(?:mbed)?|shorts|live)\/|(?:watch\/?\?(?:.*&)?v=)|(?:watch\/))|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+  const match = target.match(regex);
+  return match && match[1] ? match[1] : undefined;
+}
+
 export const getRecordingsData = query({
   args: {
-    batchId: v.id("batches")
+    batchId: v.id("batches"),
   },
   handler: async (ctx, args) => {
     const user = await requireStudentEnrolledInBatch(ctx, args.batchId);
@@ -380,9 +420,9 @@ export const getRecordingsData = query({
       .withIndex("by_batch_id", (q) => q.eq("batchId", args.batchId))
       .collect();
 
-    // Filter to only recordings (must have recordingUrl and be published or have no status)
+    // Include sessions that have recordingUrl or youtubeVideoId and are not draft/cancelled
     const recordings = liveClasses.filter(
-      (c) => c.recordingUrl && (!c.status || c.status === "Published")
+      (c) => (c.recordingUrl || c.youtubeVideoId) && c.status !== "Draft" && c.status !== "Cancelled"
     );
 
     // Fetch progress for these recordings
@@ -399,13 +439,55 @@ export const getRecordingsData = query({
 
     const recordingsWithProgress = recordings.map((rec, index) => {
       const progress = progressRecords[index];
+      const derivedYtId = rec.youtubeVideoId || parseYouTubeIdServer(rec.recordingUrl);
+      const cleanEmbedUrl = derivedYtId ? `https://www.youtube.com/embed/${derivedYtId}` : rec.recordingUrl;
+
       return {
         ...rec,
+        youtubeVideoId: derivedYtId,
+        recordingUrl: cleanEmbedUrl,
         watchProgress: progress || null,
       };
     });
 
     return recordingsWithProgress;
+  },
+});
+
+export const getRecordingById = query({
+  args: {
+    batchId: v.id("batches"),
+    recordingId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireStudentEnrolledInBatch(ctx, args.batchId);
+    if (!user) return null;
+    const userId = user._id;
+
+    const allInBatch = await ctx.db
+      .query("liveClasses")
+      .withIndex("by_batch_id", (q) => q.eq("batchId", args.batchId))
+      .collect();
+
+    const recording = allInBatch.find((r) => r._id === args.recordingId);
+    if (!recording) return null;
+
+    const progress = await ctx.db
+      .query("recordingProgress")
+      .withIndex("by_user_recording", (q) =>
+        q.eq("userId", userId).eq("recordingId", recording._id)
+      )
+      .first();
+
+    const derivedYtId = recording.youtubeVideoId || parseYouTubeIdServer(recording.recordingUrl);
+    const cleanEmbedUrl = derivedYtId ? `https://www.youtube.com/embed/${derivedYtId}` : recording.recordingUrl;
+
+    return {
+      ...recording,
+      youtubeVideoId: derivedYtId,
+      recordingUrl: cleanEmbedUrl,
+      watchProgress: progress || null,
+    };
   },
 });
 

@@ -7,6 +7,22 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 const CACHE_TTL = 10; // 10 seconds for real-time live class synchronization
 
+function safeIsoDate(val: any, fallback = new Date().toISOString()): string {
+  if (val === null || val === undefined) return fallback;
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return fallback;
+    return d.toISOString();
+  } catch {
+    return fallback;
+  }
+}
+
+function safeDatePart(val: any, fallback = new Date().toISOString().split("T")[0]): string {
+  const iso = safeIsoDate(val, fallback);
+  return iso.split("T")[0];
+}
+
 export async function getStudentDashboard(clerkId: string, token?: string): Promise<any> {
   const cacheKey = `student:dashboard:${clerkId}`;
   
@@ -28,25 +44,25 @@ export async function getStudentDashboard(clerkId: string, token?: string): Prom
   
   if (!dashboardData) return null;
 
-  // Format dates in the response
+  // Format dates safely in the response
   const formattedData = {
     ...dashboardData,
-    enrollments: dashboardData.enrollments.map((e: any) => ({
+    enrollments: (dashboardData.enrollments || []).map((e: any) => ({
       ...e,
       batch: e.batch ? {
         ...e.batch,
-        startDate: new Date(e.batch.startDate).toISOString().split('T')[0],
-        endDate: new Date(e.batch.endDate).toISOString().split('T')[0],
+        startDate: safeDatePart(e.batch.startDate),
+        endDate: safeDatePart(e.batch.endDate),
       } : null,
     })),
-    announcements: dashboardData.announcements.map((a: any) => ({
+    announcements: (dashboardData.announcements || []).map((a: any) => ({
       ...a,
-      createdAt: new Date(a.createdAt).toISOString(),
+      createdAt: safeIsoDate(a.createdAt),
     })),
-    upcomingClasses: dashboardData.upcomingClasses.map((c: any) => ({
+    upcomingClasses: (dashboardData.upcomingClasses || []).map((c: any) => ({
       ...c,
-      startTime: new Date(c.startTime).toISOString(),
-      endTime: new Date(c.endTime).toISOString(),
+      startTime: safeIsoDate(c.startTime),
+      endTime: safeIsoDate(c.endTime),
     })),
     availableCourses: dashboardData.availableCourses || [],
   };
@@ -91,10 +107,10 @@ export async function getCourseLMS(clerkId: string, courseId: string, token?: st
 
   const formattedData = {
     ...lmsData,
-    liveClasses: lmsData.liveClasses.map((c: any) => ({
+    liveClasses: (lmsData.liveClasses || []).map((c: any) => ({
       ...c,
-      startTime: new Date(c.startTime).toISOString(),
-      endTime: new Date(c.endTime).toISOString(),
+      startTime: safeIsoDate(c.startTime),
+      endTime: safeIsoDate(c.endTime),
     }))
   };
 
@@ -137,14 +153,14 @@ export async function getBatchLMS(clerkId: string, batchId: string, token?: stri
 
   const formattedData = {
     ...lmsData,
-    liveClasses: lmsData.liveClasses.map((c: any) => ({
+    liveClasses: (lmsData.liveClasses || []).map((c: any) => ({
       ...c,
-      startTime: new Date(c.startTime).toISOString(),
-      endTime: new Date(c.endTime).toISOString(),
+      startTime: safeIsoDate(c.startTime),
+      endTime: safeIsoDate(c.endTime),
     })),
-    announcements: lmsData.announcements.map((a: any) => ({
+    announcements: (lmsData.announcements || []).map((a: any) => ({
       ...a,
-      createdAt: new Date(a.createdAt).toISOString(),
+      createdAt: safeIsoDate(a.createdAt),
     }))
   };
 
@@ -171,23 +187,23 @@ export async function getCourseDashboardContext(clerkId: string, batchId: string
 
   return {
     ...contextData,
-    liveClasses: contextData.liveClasses.map((c: any) => ({
+    liveClasses: (contextData.liveClasses || []).map((c: any) => ({
       ...c,
-      startTime: new Date(c.startTime).toISOString(),
-      endTime: new Date(c.endTime).toISOString(),
+      startTime: safeIsoDate(c.startTime),
+      endTime: safeIsoDate(c.endTime),
     })),
-    announcements: contextData.announcements.map((a: any) => ({
+    announcements: (contextData.announcements || []).map((a: any) => ({
       ...a,
-      createdAt: new Date(a.createdAt).toISOString(),
+      createdAt: safeIsoDate(a.createdAt),
     })),
-    assignments: contextData.assignments.map((a: any) => ({
+    assignments: (contextData.assignments || []).map((a: any) => ({
       ...a,
-      dueDate: new Date(a.dueDate).toISOString(),
-      createdAt: new Date(a.createdAt).toISOString(),
+      dueDate: safeIsoDate(a.dueDate),
+      createdAt: safeIsoDate(a.createdAt),
     })),
-    activities: contextData.activities.map((a: any) => ({
+    activities: (contextData.activities || []).map((a: any) => ({
       ...a,
-      timestamp: new Date(a.timestamp).toISOString(),
+      timestamp: safeIsoDate(a.timestamp),
     })),
   };
 }
