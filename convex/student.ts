@@ -440,7 +440,7 @@ export const getRecordingsData = query({
     const recordingsWithProgress = recordings.map((rec, index) => {
       const progress = progressRecords[index];
       const derivedYtId = rec.youtubeVideoId || parseYouTubeIdServer(rec.recordingUrl);
-      const cleanEmbedUrl = derivedYtId ? `https://www.youtube.com/embed/${derivedYtId}` : rec.recordingUrl;
+      const cleanEmbedUrl = derivedYtId ? `https://www.youtube-nocookie.com/embed/${derivedYtId}` : rec.recordingUrl;
 
       return {
         ...rec,
@@ -480,7 +480,7 @@ export const getRecordingById = query({
       .first();
 
     const derivedYtId = recording.youtubeVideoId || parseYouTubeIdServer(recording.recordingUrl);
-    const cleanEmbedUrl = derivedYtId ? `https://www.youtube.com/embed/${derivedYtId}` : recording.recordingUrl;
+    const cleanEmbedUrl = derivedYtId ? `https://www.youtube-nocookie.com/embed/${derivedYtId}` : recording.recordingUrl;
 
     return {
       ...recording,
@@ -488,6 +488,97 @@ export const getRecordingById = query({
       recordingUrl: cleanEmbedUrl,
       watchProgress: progress || null,
     };
+  },
+});
+
+export const recordRecordingOpened = mutation({
+  args: {
+    batchId: v.id("batches"),
+    recordingId: v.id("liveClasses"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireStudentEnrolledInBatch(ctx, args.batchId);
+    if (!user) return { success: false, reason: "Unauthorized" };
+    const userId = user._id;
+
+    const session = await ctx.db.get(args.recordingId);
+    if (!session || session.batchId !== args.batchId) {
+      return { success: false, reason: "Recording session not found" };
+    }
+
+    const batch = await ctx.db.get(args.batchId);
+    if (!batch) {
+      return { success: false, reason: "Batch not found" };
+    }
+
+    const now = Date.now();
+
+    // 1. Log activity in student timeline if not logged in the last 15 minutes
+    const recentActivity = await ctx.db
+      .query("activities")
+      .withIndex("by_batch_id", (q) => q.eq("batchId", args.batchId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.eq(q.field("resourceId"), args.recordingId),
+          q.gte(q.field("timestamp"), now - 15 * 60 * 1000)
+        )
+      )
+      .first();
+
+    if (!recentActivity) {
+      await ctx.db.insert("activities", {
+        userId,
+        courseId: batch.courseId,
+        batchId: args.batchId,
+        type: "Recording Watched",
+        title: `Watched: ${session.title}`,
+        timestamp: now,
+        resourceId: args.recordingId,
+      });
+    }
+
+    // 2. Mark attendance for recording watch if not marked yet
+    const existingAttendance = await ctx.db
+      .query("attendance")
+      .withIndex("by_user_live_class", (q) =>
+        q.eq("userId", userId).eq("liveClassId", session._id)
+      )
+      .first();
+
+    if (!existingAttendance) {
+      await ctx.db.insert("attendance", {
+        userId,
+        batchId: args.batchId,
+        liveClassId: session._id,
+        status: "Present",
+        attendanceSource: "recording_watch",
+        markedAt: now,
+        notes: "Automated attendance via recording watch",
+      });
+    }
+
+    // 3. Initialize / update progress
+    const existingProgress = await ctx.db
+      .query("recordingProgress")
+      .withIndex("by_user_recording", (q) =>
+        q.eq("userId", userId).eq("recordingId", session._id)
+      )
+      .first();
+
+    if (!existingProgress) {
+      await ctx.db.insert("recordingProgress", {
+        userId,
+        batchId: args.batchId,
+        recordingId: session._id,
+        timestamp: 60,
+        percentage: 100,
+        status: "Completed",
+        updatedAt: now,
+      });
+    }
+
+    return { success: true };
   },
 });
 

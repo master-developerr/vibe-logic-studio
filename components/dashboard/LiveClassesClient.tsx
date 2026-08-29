@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { JoinClassButton } from "./JoinClassButton";
 import { WatchRecordingButton } from "./WatchRecordingButton";
+import { RecordingPlayerModal } from "./RecordingPlayerModal";
 import {
   Clock, 
   Calendar, 
@@ -22,6 +23,7 @@ import { format, isSameDay, differenceInMinutes } from "date-fns";
 type LiveClassType = any;
 
 export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerkId?: string }) {
+  const [selectedRecording, setSelectedRecording] = useState<any | null>(null);
   const data = useQuery(api.student.getLiveClassesViewData, { 
     batchId: batchId as Id<"batches">,
   });
@@ -349,6 +351,7 @@ export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerk
                             <WatchRecordingButton
                               sessionId={cls._id}
                               batchId={batchId}
+                              onWatch={() => setSelectedRecording(cls)}
                             />
                           ) : (
                             <span className="text-xs font-semibold text-text-muted select-none">
@@ -403,6 +406,7 @@ export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerk
                         <WatchRecordingButton
                           sessionId={cls._id}
                           batchId={batchId}
+                          onWatch={() => setSelectedRecording(cls)}
                         />
                       ) : (
                         <span className="text-xs font-semibold text-text-muted select-none">
@@ -458,6 +462,12 @@ export function LiveClassesClient({ batchId, clerkId }: { batchId: string, clerk
           </div>
         )}
       </div>
+      {/* EMBEDDED MODAL PLAYER */}
+      <RecordingPlayerModal
+        recording={selectedRecording}
+        batchId={batchId as Id<"batches">}
+        onClose={() => setSelectedRecording(null)}
+      />
     </div>
   );
 }

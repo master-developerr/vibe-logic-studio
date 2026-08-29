@@ -1,6 +1,6 @@
 /**
  * Comprehensive utility functions for YouTube URL normalization, extraction,
- * thumbnail resolution, and responsive player embedding.
+ * thumbnail resolution, and responsive player embedding using youtube-nocookie.com.
  */
 
 /**
@@ -90,13 +90,14 @@ export function extractYouTubeVideoId(input: string | null | undefined): string 
 }
 
 /**
- * Returns clean canonical 16:9 embeddable YouTube URL for iframe src.
+ * Returns privacy-enhanced canonical 16:9 embeddable YouTube URL for iframe src.
+ * Uses https://www.youtube-nocookie.com/embed/{videoId}
  * Automatically strips all share tracking parameters (?si=..., &utm_source=...).
  */
 export function getYouTubeEmbedUrl(input: string | null | undefined): string | null {
   const videoId = extractYouTubeVideoId(input);
   if (!videoId) return null;
-  return `https://www.youtube.com/embed/${videoId}`;
+  return `https://www.youtube-nocookie.com/embed/${videoId}`;
 }
 
 /**

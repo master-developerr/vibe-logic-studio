@@ -10,6 +10,7 @@ interface WatchRecordingButtonProps {
   batchId: string;
   className?: string;
   children?: React.ReactNode;
+  onWatch?: () => void;
 }
 
 export function WatchRecordingButton({
@@ -17,6 +18,7 @@ export function WatchRecordingButton({
   batchId,
   className,
   children,
+  onWatch,
 }: WatchRecordingButtonProps) {
   const router = useRouter();
   const [isOpening, setIsOpening] = useState(false);
@@ -24,6 +26,11 @@ export function WatchRecordingButton({
   const handleWatch = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (isOpening) return;
+
+    if (onWatch) {
+      onWatch();
+      return;
+    }
 
     setIsOpening(true);
     try {

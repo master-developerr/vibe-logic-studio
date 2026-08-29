@@ -223,7 +223,7 @@ export function RecordingPlayerClient({ batchId, recordingId, clerkId }: Recordi
       <div className="w-full bg-black rounded-2xl overflow-hidden shadow-md border border-border mb-6 aspect-video relative flex items-center justify-center">
         {youtubeVideoId ? (
           <iframe
-            src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&rel=0`}
+            src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}?autoplay=1&rel=0`}
             title={recording.title || "Course recording"}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
