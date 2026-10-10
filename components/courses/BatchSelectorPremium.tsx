@@ -157,13 +157,7 @@ export function BatchSelectorPremium({ batches, price, courseSlug }: BatchSelect
             </button>
           ) : (
             <Link
-              href={
-                isSignedIn
-                  ? `/checkout?courseSlug=${courseSlug}&batchId=${selectedBatchId}`
-                  : `/sign-up?redirect_url=${encodeURIComponent(
-                      `/checkout?courseSlug=${courseSlug}&batchId=${selectedBatchId}`
-                    )}`
-              }
+              href={`/checkout?courseSlug=${courseSlug}&batchId=${selectedBatchId}`}
               className="group relative flex h-14 w-full items-center justify-between rounded-full bg-text-primary pl-6 pr-2 text-sm font-bold text-surface overflow-hidden transition-transform duration-150 active:scale-[0.98] shadow-lg"
               style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
             >

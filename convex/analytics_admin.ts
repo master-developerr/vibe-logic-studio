@@ -153,7 +153,7 @@ export const getLiveActivity = query({
           id: `pay_${p._id}`,
           type: "payment",
           timestamp: p.createdAt,
-          user: userMap.get(p.userId) || "Unknown User",
+          user: (p.userId ? userMap.get(p.userId) : p.customerName) || "Unknown User",
           amount: p.netAmount ?? p.amount,
           courseTitle: p.courseId ? courseMap.get(p.courseId) : "A course",
         });

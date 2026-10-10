@@ -58,3 +58,40 @@ export async function invalidateCourseCache(slug: string): Promise<void> {
     console.error("[course-cache/invalidateCourseCache]", error);
   }
 }
+
+export async function invalidatePurchaseRelatedCaches(params: {
+  courseSlug?: string;
+  courseId?: string;
+  batchId?: string;
+  clerkId?: string;
+}): Promise<void> {
+  if (redis === null) return;
+
+  try {
+    const pipeline = redis.pipeline();
+
+    if (params.courseSlug) {
+      pipeline.del(`course:v1:${params.courseSlug}`);
+      pipeline.del(`courses:detail:${params.courseSlug}`);
+    }
+
+    pipeline.del("marketplace:v1:*");
+    pipeline.del("courses:market:*");
+
+    if (params.clerkId) {
+      pipeline.del(`student:dashboard:${params.clerkId}`);
+      if (params.courseId) {
+        pipeline.del(`student:lms:${params.clerkId}:${params.courseId}`);
+      }
+      if (params.batchId) {
+        pipeline.del(`student:batchLms:${params.clerkId}:${params.batchId}`);
+        pipeline.del(`student:dashboardContext:${params.clerkId}:${params.batchId}`);
+      }
+    }
+
+    await pipeline.exec();
+  } catch (error: unknown) {
+    // Observable failure without failing the payment lifecycle
+    console.error("[course-cache/invalidatePurchaseRelatedCaches] Cache eviction warning:", error);
+  }
+}

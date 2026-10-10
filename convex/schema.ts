@@ -41,9 +41,20 @@ export default defineSchema({
         device: v.string(),
         mfaEnabled: v.boolean(),
         verificationStatus: v.string(), // "Verified" | "Unverified"
+        activeSessions: v.optional(
+          v.array(
+            v.object({
+              ipHash: v.string(),
+              device: v.string(),
+              lastSeen: v.number(),
+            })
+          )
+        ),
+        flaggedSharing: v.optional(v.boolean()),
       })
     ),
-  }).index("by_clerk_id", ["clerkId"]),
+  }).index("by_clerk_id", ["clerkId"])
+    .index("by_email", ["email"]),
 
   courses: defineTable({
     slug: v.string(),
@@ -112,7 +123,8 @@ export default defineSchema({
     .index("by_user_course_batch", ["userId", "courseId", "batchId"]),
 
   payments: defineTable({
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")),
+    purchaseId: v.optional(v.id("purchases")),
     razorpayOrderId: v.string(),
     amount: v.number(),
     status: v.string(), // "pending" | "successful" | "failed" | "refunded"
@@ -145,6 +157,8 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     payoutStatus: v.optional(v.string()), // "Pending" | "Settled" | "In Transit"
   }).index("by_user_id", ["userId"])
+    .index("by_purchase_id", ["purchaseId"])
+    .index("by_razorpay_order_id", ["razorpayOrderId"])
     .index("by_user_course_batch", ["userId", "courseId", "batchId"]),
 
   reviews: defineTable({
@@ -351,4 +365,73 @@ export default defineSchema({
     .index("by_batch_id", ["batchId"])
     .index("by_live_class_id", ["liveClassId"])
     .index("by_user_live_class", ["userId", "liveClassId"]),
+
+  purchases: defineTable({
+    buyerName: v.string(),
+    buyerEmail: v.string(),
+    courseId: v.id("courses"),
+    batchId: v.id("batches"),
+    amount: v.number(),
+    currency: v.string(), // "INR"
+    originalPrice: v.number(),
+    couponCode: v.optional(v.string()),
+    discountAmount: v.optional(v.number()),
+    paymentStatus: v.string(), // "pending" | "verified" | "failed" | "refunded"
+    claimStatus: v.string(), // "unclaimed" | "claimed"
+    entitlementStatus: v.optional(v.string()), // "pending_claim" | "active" | "suspended" | "revoked"
+    razorpayOrderId: v.optional(v.string()),
+    razorpayPaymentId: v.optional(v.string()),
+    sessionToken: v.string(), // HttpOnly cookie validation
+    sessionTokenExpiresAt: v.number(),
+    recoveryTokenHash: v.optional(v.string()), // SHA-256 hash for secure recovery link
+    recoveryTokenExpiresAt: v.optional(v.number()),
+    recoveryAttempts: v.optional(v.number()),
+    lastRecoveryAttemptAt: v.optional(v.number()),
+    claimedByUserId: v.optional(v.id("users")),
+    claimedAt: v.optional(v.number()),
+    detailsConfirmed: v.optional(v.boolean()),
+    whatsappJoined: v.optional(v.boolean()),
+    onboardingCompleted: v.optional(v.boolean()),
+    emailHistory: v.optional(v.array(v.object({ email: v.string(), changedAt: v.number() }))),
+    reassignedByAdminId: v.optional(v.id("users")),
+    reassignedReason: v.optional(v.string()),
+    reassignedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_session_token", ["sessionToken"])
+    .index("by_razorpay_order_id", ["razorpayOrderId"])
+    .index("by_buyer_email", ["buyerEmail"])
+    .index("by_payment_status", ["paymentStatus"])
+    .index("by_claim_status", ["claimStatus"])
+    .index("by_claimed_by_user_id", ["claimedByUserId"]),
+
+  coupons: defineTable({
+    code: v.string(),
+    discountType: v.string(), // "percentage" | "fixed"
+    discountValue: v.number(),
+    courseId: v.optional(v.id("courses")), // optional: specific course or platform-wide
+    minPurchaseAmount: v.optional(v.number()),
+    maxDiscountAmount: v.optional(v.number()),
+    usageLimit: v.optional(v.number()),
+    usageCount: v.number(),
+    expiresAt: v.optional(v.number()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_code", ["code"])
+    .index("by_is_active", ["isActive"]),
+
+  emailJobs: defineTable({
+    purchaseId: v.id("purchases"),
+    recipientEmail: v.string(),
+    recipientName: v.string(),
+    type: v.string(), // "welcome_access" | "purchase_receipt"
+    status: v.string(), // "pending" | "processing" | "sent" | "failed"
+    attempts: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    resendMessageId: v.optional(v.string()),
+    rawRecoveryToken: v.optional(v.string()), // Temporarily stored until sent, then redacted
+    createdAt: v.number(),
+  }).index("by_status", ["status"])
+    .index("by_purchase_id", ["purchaseId"]),
 });

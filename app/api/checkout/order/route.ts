@@ -3,56 +3,153 @@ import { auth } from "@clerk/nextjs/server";
 import Razorpay from "razorpay";
 import { fetchQuery, fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { getPurchaseSessionFromCookies } from "@/lib/purchase-session";
+import type { Id } from "@/convex/_generated/dataModel";
 
-type CheckoutOrderRequest = {
-  courseSlug?: string;
-  courseId?: string;
-  batchId?: string;
-};
-
-function isCheckoutOrderRequest(value: unknown): value is CheckoutOrderRequest {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return ["courseSlug", "courseId", "batchId"].every((key) =>
-    record[key] === undefined || typeof record[key] === "string"
-  );
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to create checkout order";
+function extractRazorpayError(error: unknown): string {
+  if (typeof error === "object" && error !== null) {
+    const rzp = error as {
+      statusCode?: number;
+      error?: { code?: string; description?: string };
+      description?: string;
+      message?: string;
+    };
+    if (
+      rzp.statusCode === 401 ||
+      (rzp.error?.code === "BAD_REQUEST_ERROR" &&
+        rzp.error?.description?.toLowerCase().includes("authentication"))
+    ) {
+      return "Razorpay API authentication failed (HTTP 401). Verify that RAZORPAY_KEY_SECRET and NEXT_PUBLIC_RAZORPAY_KEY_ID in server environment variables match an active key pair from your Razorpay Dashboard.";
+    }
+    if (rzp.error?.description) {
+      return rzp.error.description;
+    }
+    if (rzp.description) {
+      return rzp.description;
+    }
+    if (rzp.message) {
+      return rzp.message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Failed to create checkout order";
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId: clerkId, getToken } = await auth();
-    if (!clerkId) {
-      return new Response("Unauthorized", { status: 401 });
+    const body = await req.json().catch(() => ({}));
+    const { purchaseId, courseSlug, courseId, batchId: requestedBatchId } = body;
+
+    // 1. Resolve server-side Razorpay credentials
+    const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim();
+    const key_secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+
+    if (!key_id || !key_secret) {
+      console.error("[CheckoutOrder] Missing Razorpay server credentials");
+      return NextResponse.json(
+        {
+          error:
+            "Razorpay credentials not configured on server. Please ensure NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are set in environment variables.",
+        },
+        { status: 500 }
+      );
     }
 
-    const body: unknown = await req.json();
-    if (!isCheckoutOrderRequest(body)) {
-      return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
+    const razorpay = new Razorpay({
+      key_id,
+      key_secret,
+    });
+
+    // Path A: Payment-first checkout session (if purchaseId is provided)
+    if (purchaseId) {
+      const sessionToken = await getPurchaseSessionFromCookies();
+      if (!sessionToken) {
+        return NextResponse.json(
+          { error: "Purchase session not found or expired. Please restart checkout from the course page." },
+          { status: 401 }
+        );
+      }
+
+      const purchase = await fetchQuery(api.purchases.getPurchaseForCheckout, {
+        purchaseId: purchaseId as Id<"purchases">,
+        sessionToken,
+      });
+
+      if (!purchase) {
+        return NextResponse.json(
+          { error: "Invalid purchase session. Please re-enter your details." },
+          { status: 403 }
+        );
+      }
+
+      if (purchase.batch.enrolledCount >= purchase.batch.capacity) {
+        return NextResponse.json(
+          { error: "The selected batch is full. Please choose another cohort." },
+          { status: 400 }
+        );
+      }
+
+      const amountInPaise = Math.round(purchase.amount * 100);
+
+      const order = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        notes: {
+          purchaseId: purchase.purchaseId.toString(),
+          courseId: purchase.course.id.toString(),
+          batchId: purchase.batch.id.toString(),
+        },
+      });
+
+      await fetchMutation(api.purchases.bindRazorpayOrder, {
+        purchaseId: purchase.purchaseId,
+        sessionToken,
+        razorpayOrderId: order.id,
+        amount: purchase.amount,
+        couponCode: purchase.couponCode,
+        discountAmount: purchase.discountAmount,
+      });
+
+      return NextResponse.json({
+        keyId: key_id,
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        courseTitle: purchase.course.title,
+        price: purchase.amount,
+        buyerName: purchase.buyerName,
+        buyerEmail: purchase.buyerEmail,
+      });
     }
 
-    const { courseSlug, courseId, batchId: requestedBatchId } = body;
+    // Path B: Authenticated student checkout (if courseSlug or courseId is provided)
     const targetSlug = courseSlug || courseId || "build-software-with-ai";
+    const { userId: clerkId, getToken } = await auth();
 
-    // 1. Fetch course details to verify price
+    if (!clerkId) {
+      return NextResponse.json(
+        { error: "Authentication required to checkout without a purchase session." },
+        { status: 401 }
+      );
+    }
+
     const course = await fetchQuery(api.courses.getBySlug, { slug: targetSlug });
-    
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    // Find the batch in course batches, or select earliest upcoming with capacity
     let batch = requestedBatchId
       ? course.batches.find((candidate) => candidate._id === requestedBatchId)
       : undefined;
 
     if (!batch && course.batches.length > 0) {
-      const upcomingWithCapacity = course.batches.find((candidate) =>
-        candidate.capacity > candidate.enrolledCount && (candidate.status === "upcoming" || candidate.status === "live")
+      const upcomingWithCapacity = course.batches.find(
+        (candidate) =>
+          candidate.capacity > candidate.enrolledCount &&
+          (candidate.status === "upcoming" || candidate.status === "live")
       );
       batch = upcomingWithCapacity || course.batches[0];
     }
@@ -62,28 +159,9 @@ export async function POST(req: NextRequest) {
     }
 
     const batchId = batch._id;
-
-
-    // Verify seats
-    const enrolledCount = batch.enrolledCount;
-    const capacity = batch.capacity;
-    if (enrolledCount >= capacity) {
-      return NextResponse.json({ error: "Batch is full" }, { status: 400 });
+    if (batch.enrolledCount >= batch.capacity) {
+      return NextResponse.json({ error: "The selected batch is full" }, { status: 400 });
     }
-
-
-    // 2. Initialize Razorpay and create order
-    const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    const key_secret = process.env.RAZORPAY_KEY_SECRET;
-
-    if (!key_id || !key_secret) {
-      return NextResponse.json({ error: "Razorpay credentials not configured on server" }, { status: 500 });
-    }
-
-    const razorpay = new Razorpay({
-      key_id,
-      key_secret,
-    });
 
     const amountInPaise = Math.round(course.price * 100);
 
@@ -100,13 +178,16 @@ export async function POST(req: NextRequest) {
 
     const token = (await getToken({ template: "convex" })) ?? undefined;
 
-    // 3. Create pending payment record in Convex
-    await fetchMutation(api.payments.createPendingPayment, {
-      razorpayOrderId: order.id,
-      amount: course.price,
-      courseId: course.id as Id<"courses">,
-      batchId,
-    }, { token });
+    await fetchMutation(
+      api.payments.createPendingPayment,
+      {
+        razorpayOrderId: order.id,
+        amount: course.price,
+        courseId: course.id as Id<"courses">,
+        batchId: batchId as Id<"batches">,
+      },
+      { token }
+    );
 
     return NextResponse.json({
       keyId: key_id,
@@ -117,7 +198,8 @@ export async function POST(req: NextRequest) {
       price: course.price,
     });
   } catch (error: unknown) {
-    console.error("Checkout order API error:", error);
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
+    console.error("[CheckoutOrder] Order creation error:", error);
+    const msg = extractRazorpayError(error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

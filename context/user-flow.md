@@ -59,9 +59,10 @@ flowchart TD
     COURSE_DETAIL --> VIEW_BATCH["Select Cohort in Sticky/Inline Batch Picker"]
     COURSE_DETAIL --> CLICK_ENROLL["Click 'Enroll Now' Button"]
     
-    CLICK_ENROLL --> CHECK_AUTH{"Is Visitor Authenticated?"}
-    CHECK_AUTH -->|No| REDIRECT_SIGNUP["Redirect to `/sign-up?fallback_redirect_url=/dashboard`"]
-    CHECK_AUTH -->|Yes| OPEN_CHECKOUT["Initiate Razorpay Checkout Modal"]
+    CLICK_ENROLL --> OPEN_BUYER_MODAL["Open Lightweight Buyer Details Modal (Full Name + Email)"]
+    OPEN_BUYER_MODAL --> SUBMIT_BUYER_INFO["Validate Name & Email, Show Accuracy Warning"]
+    SUBMIT_BUYER_INFO --> MINT_PURCHASE_SESSION["Server Creates `purchases` Record & Sets Session Cookie"]
+    MINT_PURCHASE_SESSION --> NAVIGATE_CHECKOUT["Navigate to `/checkout?purchaseId={id}` (No Pre-Auth)"]
 ```
 
 ### Detailed Behavioral Requirements
@@ -170,7 +171,8 @@ flowchart TD
     BATCH_STATUS -->|"status == 'completed'"| CTA_CLOSED["CTA: 'Cohort Completed' -> Disabled"]
     
     CTA_ACTIVE --> CLICK_ENROLL["User Clicks Enroll"]
-    CLICK_ENROLL --> AUTH_GUARD["Check Clerk Authentication"]
+    CLICK_ENROLL --> OPEN_BUYER_MODAL["Open EnrollModal (Full Name + Email)"]
+    OPEN_BUYER_MODAL --> MINT_PURCHASE["Create `purchases` Record & Cookie -> Go to `/checkout?purchaseId={id}`"]
 ```
 
 ### Behavioral Specifications
@@ -184,61 +186,83 @@ flowchart TD
 
 ---
 
-## 7. Enrollment & Payment Processing Flow (The Core Conversion Engine)
+## 7. Payment-First Checkout, Verification & Post-Payment Onboarding Flow
 
-This is the most critical behavioral sequence in the application. It ensures zero duplicate payments and atomic cohort assignment.
+This is the primary conversion sequence in VibeLogic Studio. It operates without pre-payment authentication or email OTP barriers, while strictly preserving backend security, verified payment durability, and post-payment Clerk account linking.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor U as Student
-    participant C as Client (`/course/[slug]`)
-    participant A as Server Action
-    participant R as Razorpay Checkout Modal
-    participant W as Webhook (`/api/webhooks/razorpay`)
+    actor U as Visitor
+    participant M as EnrollModal
+    participant C as Checkout Page (`/checkout`)
+    participant O as Order API (`/api/checkout/order`)
+    participant R as Razorpay Modal
+    participant V as Verify API / Webhook
     participant DB as Convex Database
+    participant ON as Onboarding Page (`/checkout/onboarding`)
+    participant RS as Resend Email Service
+    participant CL as Clerk Auth & Linking (`/claim`)
 
-    U->>C: Clicks "Enroll now" on Batch A
-    C->>A: Validate user auth & seat availability
-    A-->>C: Return Razorpay Order ID & Config
-    C->>R: Open Razorpay UPI/Card Modal
+    U->>M: Enters Full Name & Email
+    M->>DB: Create purchase record (`status: 'created'`, `paymentStatus: 'pending'`)
+    DB-->>M: Return purchaseId, set HttpOnly session cookie
+    M->>C: Redirect to `/checkout?purchaseId={id}`
+    C->>C: Enter coupon code (validated server-side)
+    C->>O: POST order request (bound to purchaseId)
+    O->>DB: Fetch canonical course price & batch seat validation
+    O-->>C: Return Razorpay Order ID & config (No raw secrets exposed)
+    C->>R: Open Razorpay checkout modal
     
-    alt Payment Cancelled by User
-        U->>R: Closes Modal without paying
-        R-->>C: Modal Dismissed -> Stay on Course Page (No-op)
-    else Payment Successful
-        U->>R: Completes INR Payment
-        R-->>C: Payment Success Callback (`razorpay_payment_id`)
-        C->>C: Show "Verifying your payment..." loading state
+    alt Payment Cancelled
+        U->>R: Dismisses modal
+        R-->>C: Stay on checkout page
+    else Payment Completed
+        U->>R: Submits UPI/Card payment
+        R-->>C: Payment success callback
+        C->>V: POST verify signature (`/api/checkout/verify`)
+        V->>DB: Verify signature, transition purchase to `payment_verified`, guarantee seat
+        DB->>DB: Enqueue Resend email job in `emailJobs`
+        V-->>C: Verification confirmed
+        C->>ON: Redirect to protected `/checkout/onboarding`
         
-        par Async Webhook Verification
-            R->>W: POST Webhook (`order.paid`)
-            W->>DB: Verify signature & execute atomic Enrollment mutation
-            DB->>DB: Decrement seat capacity (`enrolledCount++`)
-            DB->>DB: Insert record in `enrollments` table
-        end
+        Note over ON: Guarded by server purchase session
+        U->>ON: Step 1: Confirms/edits buyer details
+        U->>ON: Step 2: Views optional WhatsApp cohort invite
+        U->>ON: Step 3: Views payment verification summary
         
-        C->>C: Redirect to `/dashboard/materials?courseId={id}&newEnrollment=true`
+        ON->>RS: Dispatches welcome email with secure claim link
+        RS-->>U: Receives email with `/claim?recovery={token}&purchaseId={id}`
+        U->>CL: Clicks link, signs in or signs up via Clerk
+        CL->>DB: Mutate `claimPurchase`: verify Clerk email matches `buyerEmail`
+        DB->>DB: Set `claimStatus: 'claimed'`, create active `enrollments` record
+        CL-->>U: Immediate redirection to Student LMS Dashboard
     end
 ```
 
 ### Step-by-Step Behavioral Requirements
-1. **Enrollment Initiation:**
-   - User clicks `"Enroll now"`.
-   - System checks if user is logged in. If anonymous, redirect to `/sign-up?fallback_redirect_url=/course/[slug]`.
-   - If user already holds an active enrollment for this course, display a modal: *"You are already enrolled in this course!"* with a button `"Go to Classroom"`.
-2. **Checkout Modal Execution:**
-   - Server mints an INR Razorpay order and opens the overlay modal.
-   - If the user closes the modal without paying, the UI returns to normal interactive state. No draft enrollment is created.
-3. **Payment Verification & Confirmation:**
-   - Upon successful payment, the UI displays a full-screen or toast overlay: *"Payment confirmed! Preparing your classroom..."*
-   - Once Convex confirms the `enrollments` record via WebSocket or polling, the user is redirected to `/dashboard/materials?courseId={id}`.
-4. **WhatsApp Community Welcome Popup:**
-   - If `newEnrollment=true` is present in the URL on first arrival at the dashboard, present an immediate modal popup:
-     - **Title:** *"Welcome to the Cohort!"*
-     - **Body:** *"Join your official batch WhatsApp group to get daily updates, class links, and connect with peers."*
-     - **Buttons:** `"Join WhatsApp Group"` (opens link in new tab) and `"I'll join later"` (closes modal).
-   - Once dismissed, store a flag in localStorage so the popup does not repeatedly appear on page refreshes.
+1. **Pre-Checkout Buyer Initiation:**
+   - Visitor inputs Name & Email into `EnrollModal`.
+   - Clear warning shown: *"Make sure your email address is correct. Your course access instructions will be sent to this email."*
+   - Server creates a durable `purchases` record with `paymentStatus: "pending"`, `claimStatus: "unclaimed"`, an HttpOnly session token, and a secure SHA-256 recovery token hash.
+2. **Server-Authoritative Pricing & Checkout:**
+   - `/checkout` displays canonical course details, batch schedule, coupon entry, and server-calculated final amounts.
+   - Razorpay Order is minted with notes referencing only `purchaseId`, `courseId`, and `batchId` (no sensitive tokens exposed).
+3. **Cryptographic Dual-Channel Verification:**
+   - Verified synchronously via `/api/checkout/verify` or asynchronously via `/api/webhooks/razorpay`.
+   - Transitions `paymentStatus` to `"verified"`. A verified payment is permanently recorded and never erased if onboarding is interrupted.
+4. **Protected Onboarding Experience:**
+   - `/checkout/onboarding` is strictly protected by server-side purchase session validation. Unverified sessions are rejected.
+   - **Step 1:** Buyer confirms or corrects name and email before email sending.
+   - **Step 2:** Cohort WhatsApp community invite (optional and non-blocking).
+   - **Step 3:** Completion confirmation with access instructions.
+5. **Durable Email Delivery (Resend):**
+   - Welcomes buyer and provides a secure account claim link.
+   - Managed through an outbox pattern (`emailJobs`) with idempotent retries and backoff.
+6. **Post-Payment Clerk Account Linking (`/claim`):**
+   - User signs in or creates an account with Clerk.
+   - Server checks `identity.email.toLowerCase() === purchase.buyerEmail.toLowerCase()`.
+   - Upon verified match, links `purchases` record, activates `enrollments`, and redirects student to `/dashboard/courses/{batchId}/overview`.
 
 ---
 

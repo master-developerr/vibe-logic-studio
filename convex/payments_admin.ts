@@ -108,7 +108,7 @@ export const getFinanceOverview = query({
 
     // 2. Enrich payments with defaults if schema optional fields are unset
     const enriched = sortedPayments.map((p) => {
-      const u = userMap.get(p.userId);
+      const u = p.userId ? userMap.get(p.userId) : undefined;
       const c = p.courseId ? courseMap.get(p.courseId) : undefined;
       const currency = p.currency ?? "USD";
       const gateway = p.gateway ?? "Razorpay";
@@ -404,7 +404,7 @@ export const listTransactions = query({
     const courseMap = new Map(courses.map((c) => [c._id, c]));
 
     const enriched = all.map((p) => {
-      const u = userMap.get(p.userId);
+      const u = p.userId ? userMap.get(p.userId) : undefined;
       const c = p.courseId ? courseMap.get(p.courseId) : undefined;
       return {
         ...p,

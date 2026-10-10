@@ -25,6 +25,8 @@ VibeLogic Studio solves this by unifying the entire educational workflow. From l
 /marketplace       → Course Marketplace
 /course/[slug]     → Course Details page
 /checkout          → Checkout page
+/checkout/onboarding → Protected Post-Payment Onboarding
+/claim             → Secure Purchase Claim & Account Link
 /dashboard         → Student dashboard home
 /calendar          → Student calendar for live classes
 /live              → Live Classes overview
@@ -85,9 +87,13 @@ Dashboard    Courses    Batches    Students    Payments    Reviews    Landing Pa
 - "Enroll Now" button available if seats remain.
 
 ### Checkout & Payment
-- User selects a batch and clicks Enroll Now.
-- Razorpay modal opens for payment.
-- Successful payment triggers webhook for verification.
+- Visitor inputs Name & Email into EnrollModal with email accuracy advisory.
+- Server creates purchase record & session cookie without requiring prior login.
+- Checkout displays server-calculated pricing, batch details, and coupons.
+- Payment completes via Razorpay and is cryptographically verified on the backend.
+- Protected 3-step onboarding confirms buyer details and presents optional WhatsApp invite.
+- Resend delivers welcome email with secure claim link.
+- Student authenticates via Clerk, which links the purchase to their account and unlocks the LMS dashboard.
 
 ### Automatic Batch Assignment
 - If the user buys a course without selecting a batch, the system automatically assigns them to the earliest upcoming batch with available seats.

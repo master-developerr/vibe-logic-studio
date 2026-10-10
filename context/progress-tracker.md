@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
  
--**Phase:** 21 - End-to-End Checkout & Razorpay Payment Webhook Integration (Completed)
--**Last completed:** Phase 21 — Implemented secure Razorpay checkout page (`/checkout`), server-side Order generation API (`/api/checkout/order`), signature-verified payment capture webhook (`/api/webhooks/razorpay`), real-time database enrollment sync (`convex/payments.ts`), pluralized course slug 404 links correction, LMS redirect loop resolution (`/learn/[courseId]`), and cache-aware student lesson completion API (`/api/student/mark-complete`) with Upstash Redis eviction.
--**Next:** Phase 22 — Admin Reviews & Testimonials Management Redesign (`/admin/reviews`).
+- **Phase:** 22 - Payment-First Checkout, Secure Purchase Recovery & Post-Payment Onboarding (Complete & Security Audited)
+- **Current Work:** Completed implementation of audit remediations: (1) Server Actions for onboarding session handling without client HttpOnly cookie access, (2) Redis course/batch cache invalidation on payment capture, (3) CRON_SECRET authenticated email dispatch with bounded batch worker, and (4) Concurrency-safe batch capacity check with `pending_reconciliation` state and admin reassignment.
+- **Next:** End-to-end production monitoring and deployment readiness.
  
  
  ---
@@ -154,6 +154,16 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] Extended Convex backend schema (`liveClasses` table fields) and dedicated admin API (`getBatchRecordingsExtended`, `bulkUpdateBatchRecordingsExtended`)
 - [x] React Rules of Hooks & TypeScript safety across all components
 
+### Phase 22 - Payment-First Checkout, Secure Purchase Recovery & Post-Payment Onboarding
+
+- [x] Step 1: Lightweight Visitor Entry (`<EnrollModal />` & `/build-software-with-ai` trigger)
+- [x] Step 2: Unauthenticated Server-Priced Checkout (`/checkout` & `/api/checkout/order`)
+- [x] Step 3: Dual-Channel Signature Verification & Atomic Seat Allocation (`/api/checkout/verify` & `/api/webhooks/razorpay`)
+- [x] Step 4: Protected Post-Payment Onboarding Flow (`/checkout/onboarding` & `<OnboardingFlow />`)
+- [x] Step 5: Secure Account Linking, Email Verification & Course Claim (`/claim` & `claimPurchase` mutation)
+- [x] Step 6: Transactional Welcome Email via Resend (`emailJobs` table & `/api/checkout/email-dispatch`)
+- [x] Step 7: Moderate Account-Sharing Telemetry & Device Monitoring (`recordStudentSession` mutation)
+
 ---
 
 ## Decisions Made During Build
@@ -174,6 +184,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - Batch Activity Management (`/admin/batches/[batchId]/activity`) is structured as an Enterprise Activity Center featuring an executive header toolbar (`BatchActivityToolbar`) with a pulsing `LIVE MONITORING` badge and CSV/JSON export action, a 5-card Bento KPI grid (`TOTAL EVENTS`, `STUDENTS`, `CONTENT`, `PAYMENTS`, `SYSTEM`) with time horizon stats (`today`, `this week`, `this month`), multi-dimensional search and filtering bar (`BatchActivityFilters`) with saved enterprise filter presets (`⚡ Presets`) and quick status chips, a chronological date-grouped audit trail (`BatchActivityFeed`) with expandable payload inspector and status chips, and a sticky Operations Dashboard Sidebar (`BatchActivitySidebar`) featuring a Pure CSS Donut Chart (`Activity Summary`), Top Contributors list with `VIEW ALL` toggle, Recent Alerts severity cards, and an interactive Jump to Date Calendar with floating bottom `↑ Jump to Today` CTA. Extended the backend with `getBatchActivityExtended` and `logBatchActivityExtended` queries/mutations in `convex/admin.ts`. All React hooks are called unconditionally at the top level and zero raw hex colors are used.
 - Admin Payments & Enterprise SaaS Financial Console (`/admin/payments`) uses an 8-Card Bento KPI grid (`Total Revenue`, `MRR`, `Successful Transactions`, `Average Order Value`, `Active Subscriptions`, `Pending Settlements`, `Refunds & Disputes`, `Failed Transactions`), SVG Line/Area & Gateway Share Chart (`RevenueAnalyticsSection`), and 7 specialized modules (`TransactionsTable`, `TransactionDetailModal`, `SubscriptionsTable`, `RefundsTable`, `InvoicesTable`, `FinancialActivityLog`, and `PaymentsClient`). Extended `payments` table in `schema.ts` with optional SaaS fields (`plan`, `gateway`, `renewalDate`, `refundStatus`, `invoiceNumber`, `taxAmount`, etc.) and implemented auth-hydration safe defaults in `convex/payments_admin.ts` to prevent WebSocket auth race conditions.
 - Implemented secure, server-side Razorpay checkout flow with signature verification. Handled dynamic batch selection responsive layouts for mobile users. Resolved student LMS redirect loops by routing active enrollments directly to their batch classroom workspace. Used a Next.js API route `/api/student/mark-complete` to run Convex mutations and evict student Redis cache keys concurrently, maintaining real-time consistency.
+- **Payment-First Architecture & Secure Purchase Recovery**: Visitor checkout does not require pre-registration or auth barriers. Pre-payment session is created via `/api/checkout/session` with HttpOnly cookie. Razorpay notes only store safe IDs (`purchaseId`, `courseId`, `batchId`). Dual-channel payment fulfillment (`/api/checkout/verify` and webhook) idempotently records payment, allocates seat, creates pending enrollment, and enqueues Resend welcome email. Raw recovery tokens are never stored plain-text (SHA-256 hash in database). Account linking requires authenticated Clerk user whose verified email strictly matches the buyer email. Non-blocking onboarding at `/checkout/onboarding` allows profile review and optional WhatsApp group join. Device session tracking records active client footprints with moderate account-sharing threshold detection.
 
 ---
 

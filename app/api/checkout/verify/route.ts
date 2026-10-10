@@ -3,79 +3,134 @@ import { auth } from "@clerk/nextjs/server";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { verifyRazorpayPaymentSignature } from "@/lib/razorpay";
-import { Id } from "@/convex/_generated/dataModel";
-
-type CheckoutVerificationRequest = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-  courseSlug: string;
-  batchId: string;
-};
-
-function isCheckoutVerificationRequest(value: unknown): value is CheckoutVerificationRequest {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return ["razorpay_order_id", "razorpay_payment_id", "razorpay_signature", "courseSlug", "batchId"].every(
-    (key) => typeof record[key] === "string" && record[key].length > 0
-  );
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to verify checkout";
-}
+import { getPurchaseSessionFromCookies } from "@/lib/purchase-session";
+import type { Id } from "@/convex/_generated/dataModel";
+import { invalidatePurchaseRelatedCaches } from "@/lib/course-cache";
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json().catch(() => ({}));
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      purchaseId,
+      courseSlug,
+      batchId,
+    } = body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return NextResponse.json({ error: "Missing required Razorpay payment parameters" }, { status: 400 });
+    }
+
+    const secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    if (!secret) {
+      console.error("[CheckoutVerify] RAZORPAY_KEY_SECRET is not configured on server");
+      return NextResponse.json({ error: "Server payment configuration error" }, { status: 500 });
+    }
+
+    const isValid = verifyRazorpayPaymentSignature(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      secret
+    );
+
+    if (!isValid) {
+      console.warn("[CheckoutVerify] Invalid Razorpay signature for order:", razorpay_order_id);
+      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
+    }
+
+    // Path A: Purchase session fulfillment (Payment-First flow)
+    if (purchaseId) {
+      const sessionToken = await getPurchaseSessionFromCookies();
+      if (!sessionToken) {
+        return NextResponse.json(
+          { error: "Purchase session expired. Please contact support if charged." },
+          { status: 401 }
+        );
+      }
+
+      const purchase = await fetchQuery(api.purchases.getPurchaseForCheckout, {
+        purchaseId: purchaseId as Id<"purchases">,
+        sessionToken,
+      });
+
+      if (!purchase) {
+        return NextResponse.json({ error: "Invalid purchase session" }, { status: 403 });
+      }
+
+      const result = await fetchMutation(api.payments.fulfillPurchasePayment, {
+        purchaseId: purchase.purchaseId,
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        amount: purchase.amount,
+        paymentMethod: "Razorpay Checkout",
+        gateway: "Razorpay",
+      });
+
+      await invalidatePurchaseRelatedCaches({
+        courseSlug: result.courseSlug || purchase.course.slug,
+        courseId: result.courseId || purchase.course.id,
+        batchId: result.batchId || purchase.batch.id,
+      });
+
+      return NextResponse.json({
+        success: true,
+        purchaseId: purchase.purchaseId,
+        oversubscribed: result.oversubscribed ?? false,
+        onboardingUrl: `/checkout/onboarding?purchaseId=${purchase.purchaseId}`,
+      });
+    }
+
+    // Path B: Authenticated Clerk student fulfillment
     const { userId: clerkId, getToken } = await auth();
     if (!clerkId) {
-      return new Response("Unauthorized", { status: 401 });
+      return NextResponse.json(
+        { error: "Authentication required to verify payment without a purchase session" },
+        { status: 401 }
+      );
     }
 
-    const body: unknown = await req.json();
-    if (!isCheckoutVerificationRequest(body)) {
-      return NextResponse.json({ error: "Missing or invalid required fields" }, { status: 400 });
+    if (!courseSlug || !batchId) {
+      return NextResponse.json(
+        { error: "Missing courseSlug or batchId for authenticated verification" },
+        { status: 400 }
+      );
     }
-
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseSlug, batchId } = body;
 
     const course = await fetchQuery(api.courses.getBySlug, { slug: courseSlug });
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
-    const courseId = course.id;
-
-    const secret = process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) {
-      console.error("RAZORPAY_KEY_SECRET environment variable is missing on server");
-      return NextResponse.json({ error: "Configuration error" }, { status: 500 });
-    }
-
-    const isValid = verifyRazorpayPaymentSignature(
-      razorpay_order_id, 
-      razorpay_payment_id, 
-      razorpay_signature, 
-      secret
-    );
-
-    if (!isValid) {
-      console.warn("Invalid signature during checkout verification");
-      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
-    }
 
     const token = (await getToken({ template: "convex" })) ?? undefined;
 
-    // Securely invoke Convex to mark payment as successful and create enrollment
-    const result = await fetchMutation(api.payments.confirmPayment, {
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      courseId: courseId as Id<"courses">,
-      batchId: batchId as Id<"batches">,
-    }, { token });
+    const result = await fetchMutation(
+      api.payments.confirmPayment,
+      {
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        courseId: course.id as Id<"courses">,
+        batchId: batchId as Id<"batches">,
+      },
+      { token }
+    );
 
-    return NextResponse.json({ success: true, result });
+    await invalidatePurchaseRelatedCaches({
+      courseSlug: course.slug,
+      courseId: course.id as Id<"courses">,
+      batchId: batchId as Id<"batches">,
+    });
+
+    return NextResponse.json({
+      success: true,
+      result,
+      redirectUrl: `/dashboard/courses/${batchId}/overview?success=true`,
+    });
   } catch (error: unknown) {
-    console.error("Checkout verify API error:", error);
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
+    console.error("[CheckoutVerify] Verification error:", error);
+    const msg = error instanceof Error ? error.message : "Payment verification failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

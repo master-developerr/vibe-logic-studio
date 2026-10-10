@@ -1,42 +1,75 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CheckoutFlowClient } from "@/components/courses/CheckoutFlowClient";
 import Link from "next/link";
 import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { getPurchaseSessionFromCookies } from "@/lib/purchase-session";
+import { EnrollModal } from "@/components/courses/EnrollModal";
 
 export default async function CheckoutPage({
   searchParams,
 }: {
-  searchParams: Promise<{ courseSlug?: string; batchId?: string; courseId?: string }>;
+  searchParams: Promise<{
+    courseSlug?: string;
+    batchId?: string;
+    courseId?: string;
+    purchaseId?: string;
+  }>;
 }) {
-  const { userId } = await auth();
   const params = await searchParams;
-  const targetCourseQuery = params.courseSlug || params.courseId || "build-software-with-ai";
+  const sessionToken = await getPurchaseSessionFromCookies();
 
-  // 1. Fetch course details (includes batches)
-  const course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
-  if (!course) {
-    redirect("/");
+  // If purchaseId is present in query, fetch the server-persisted purchase session
+  let purchase = null;
+  if (params.purchaseId && sessionToken) {
+    purchase = await fetchQuery(api.purchases.getPurchaseForCheckout, {
+      purchaseId: params.purchaseId as Id<"purchases">,
+      sessionToken,
+    });
   }
 
-  // 2. Locate or auto-select target batch
-  let targetBatch = params.batchId
+  // Fallback to course by slug if direct navigation
+  const targetCourseQuery =
+    purchase?.course.slug || params.courseSlug || params.courseId || "build-software-with-ai";
+
+  const course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
+  if (!course) {
+    return (
+      <main className="min-h-screen bg-background py-16 px-4 text-center">
+        <p className="text-sm font-semibold text-text-secondary">Course not found.</p>
+        <Link href="/" className="mt-4 inline-block text-xs font-bold text-primary underline">
+          Return to Home
+        </Link>
+      </main>
+    );
+  }
+
+  // Resolve target batch
+  let targetBatch = purchase
+    ? course.batches.find((b) => b._id === purchase.batch.id)
+    : params.batchId
     ? course.batches.find((candidate) => candidate._id === params.batchId)
     : undefined;
 
   if (!targetBatch && course.batches.length > 0) {
-    // Select earliest valid upcoming batch with capacity
-    const upcomingWithCapacity = course.batches.find((candidate) =>
-      candidate.capacity > candidate.enrolledCount && (candidate.status === "upcoming" || candidate.status === "live")
+    const upcomingWithCapacity = course.batches.find(
+      (candidate) =>
+        candidate.capacity > candidate.enrolledCount &&
+        (candidate.status === "upcoming" || candidate.status === "live")
     );
     targetBatch = upcomingWithCapacity || course.batches[0];
   }
 
   if (!targetBatch) {
-    redirect(course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint" ? "/build-software-with-ai" : "/");
+    return (
+      <main className="min-h-screen bg-background py-16 px-4 text-center">
+        <p className="text-sm font-semibold text-text-secondary">No active cohorts available.</p>
+        <Link href="/" className="mt-4 inline-block text-xs font-bold text-primary underline">
+          Return to Home
+        </Link>
+      </main>
+    );
   }
 
   const batchId = targetBatch._id;
@@ -45,28 +78,26 @@ export default async function CheckoutPage({
     slug: course.slug,
     category: course.category,
     title: course.title,
-    price: course.price,
+    price: purchase?.originalPrice || course.price,
   };
+
   const checkoutBatch = {
     id: batchId as Id<"batches">,
     title: targetBatch.title,
     startDate: targetBatch.startDate,
   };
 
-  if (!userId) {
-    // If not authenticated, redirect to sign-up and force redirect back to this checkout URL
-    const redirectUrl = encodeURIComponent(`/checkout?courseSlug=${course.slug}&batchId=${batchId}`);
-    redirect(`/sign-up?redirect_url=${redirectUrl}`);
-  }
-
   return (
-    <main className="min-h-screen bg-background py-16 px-4 md:px-8">
+    <main className="min-h-screen bg-background py-12 md:py-16 px-4 md:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        
         {/* Navigation & Header */}
         <div className="flex items-center justify-between border-b border-border/60 pb-6">
           <Link
-            href={course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint" ? "/build-software-with-ai" : "/"}
+            href={
+              course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint"
+                ? "/build-software-with-ai"
+                : "/"
+            }
             className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-text-secondary hover:text-text-primary transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -74,15 +105,35 @@ export default async function CheckoutPage({
           </Link>
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.14em] bg-primary/10 text-primary border border-primary/20">
             <ShieldCheck className="w-3.5 h-3.5" />
-            Secured Checkout
+            Direct Secure Checkout
           </div>
         </div>
 
-        <CheckoutFlowClient 
-          course={checkoutCourse}
-          batch={checkoutBatch}
-        />
-
+        {/* If purchase session exists, render the active checkout flow */}
+        {purchase ? (
+          <CheckoutFlowClient
+            course={checkoutCourse}
+            batch={checkoutBatch}
+            purchaseId={purchase.purchaseId}
+            buyerName={purchase.buyerName}
+            buyerEmail={purchase.buyerEmail}
+            appliedCoupon={purchase.couponCode}
+            discountAmount={purchase.discountAmount}
+            currentAmount={purchase.amount}
+          />
+        ) : (
+          /* Direct visit without buyer session: Prompt buyer details */
+          <div className="max-w-md mx-auto py-12">
+            <EnrollModal
+              isOpen={true}
+              onClose={() => {}}
+              courseSlug={course.slug}
+              courseTitle={course.title}
+              batchId={batchId}
+              price={course.price}
+            />
+          </div>
+        )}
       </div>
     </main>
   );

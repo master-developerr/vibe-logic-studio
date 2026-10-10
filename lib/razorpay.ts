@@ -17,8 +17,15 @@ export function verifyRazorpaySignature(body: string, signature: string | null, 
     .createHmac("sha256", secret)
     .update(body)
     .digest("hex");
+
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signature);
+
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
     
-  return expectedSignature === signature;
+  return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
 /**
@@ -39,6 +46,13 @@ export function verifyRazorpayPaymentSignature(orderId: string, paymentId: strin
     .createHmac("sha256", secret)
     .update(orderId + "|" + paymentId)
     .digest("hex");
+
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signature);
+
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
     
-  return expectedSignature === signature;
+  return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }

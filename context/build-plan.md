@@ -137,52 +137,63 @@ Wire the Marketplace and Details pages to Convex DB.
 
 ---
 
-## Phase 3 — Checkout & Enrollment
+## Phase 3 — Payment-First Checkout, Secure Purchase Recovery & Post-Payment Onboarding
 
-### 08 Checkout UI & Razorpay Integration
+### 08 Lightweight Buyer Modal & Session Initiation
 
-Implement the checkout flow and payment gateway UI.
+Visitor clicks "Enroll Now" without any pre-authentication or OTP requirements.
 
 **UI:**
-
-- Simple loading overlay during Razorpay SDK initialization
-- Razorpay popup modal handles actual payment UI
+- `EnrollModal` dialog requesting Full Name and Email Address.
+- Prominent accuracy advisory: *"Make sure your email address is correct. Your course access instructions will be sent to this email. An incorrect email may prevent you from receiving them."*
 
 **Logic:**
-
-- User clicks "Enroll Now"
-- Server Action initiates Razorpay Order creation
-- Pass `order_id` to client and open Razorpay checkout
-- Handle success/failure callbacks on the client (redirect to success/failure pages)
+- Server-side mutation creates a durable `purchases` record (`paymentStatus: 'pending'`, `claimStatus: 'unclaimed'`, high-entropy session token, secure recovery hash).
+- Secure, HttpOnly cookie `vls_purchase_session` is minted.
+- Visitor is redirected to `/checkout?purchaseId=...`.
 
 ---
 
-### 09 Automatic Batch Assignment
+### 09 Server-Authoritative Checkout & Coupon Engine
 
-Implement logic to assign students to batches if they didn't explicitly choose one.
+**UI:**
+- Order breakdown showing canonical Course title, Cohort Batch schedule, Base price, Coupon field, Discount, and Net Payable amount.
+- Clean Razorpay Checkout modal trigger.
 
 **Logic:**
-
-- Convex Action evaluates checkout request
-- If `batchId` is missing, query `batches` for the course
-- Filter for `status === 'upcoming'` AND `enrolledCount < capacity`
-- Sort by `startDate` ascending (earliest first)
-- Pick the first available batch and assign to the checkout session
+- Server strictly validates price and coupons (percentage or fixed discount, usage limits, expiration) via Convex query/mutation.
+- Razorpay Order created via `/api/checkout/order` using server-calculated amount. Notes contain only `purchaseId`, `courseId`, and `batchId` (no raw secret tokens exposed).
 
 ---
 
-### 10 Enrollment Flow & Webhook
-
-Wire the post-payment verification and enrollment creation.
+### 10 Cryptographic Payment Verification & Guaranteed Seat Allocation
 
 **Logic:**
+- Dual-channel verification: synchronous client verify endpoint (`/api/checkout/verify`) and webhook (`/api/webhooks/razorpay`).
+- Verifies Razorpay signatures securely on the server.
+- Atomic Convex mutation transitions purchase `paymentStatus` to `'verified'`.
+- Seat allocation is guaranteed for verified payments without silent drops or race condition loss.
+- Durable email outbox job (`emailJobs`) is scheduled for transactional delivery.
 
-- `POST /api/webhooks/razorpay` receives payment success event
-- Check Redis for Webhook Idempotency (prevent duplicates)
-- Verify Razorpay signature using webhook secret
-- Call internal Convex Mutation:
-  - Create `payments` record (`status: 'successful'`)
-  - Increment `enrolledCount` for the assigned Batch
+---
+
+### 11 Protected 3-Step Post-Payment Onboarding (`/checkout/onboarding`)
+
+**UI & Logic:**
+- Route access strictly guarded: requires verified `vls_purchase_session` matching `paymentStatus: 'verified'`.
+- **Step 1:** Confirm/correct buyer name and email address before welcome email release.
+- **Step 2:** Join official WhatsApp cohort community (optional, non-blocking).
+- **Step 3:** Payment verified confirmation with email instructions and recovery guide.
+
+---
+
+### 12 Resend Durable Email Delivery & Clerk Account Linking
+
+**Logic:**
+- Durable worker dispatches Resend welcome email with high-entropy recovery link.
+- Student authenticates via Clerk (sign-in or sign-up).
+- Backend strictly verifies Clerk authenticated user's verified email matches the purchase's `buyerEmail`.
+- Links purchase (`claimStatus: 'claimed'`), creates active `enrollments` record, and unlocks LMS Dashboard.
   - If `enrolledCount === capacity`, update batch status to `completed`
   - Create `enrollments` record (`status: 'active'`)
 - Invalidate Redis Cache for Course/Batch details

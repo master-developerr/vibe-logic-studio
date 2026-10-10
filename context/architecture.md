@@ -143,46 +143,40 @@ Convex Mutation inserts/updates user in `users` collection
 User is fully synced and can access protected routes
 ```
 
-### Enrollment & Payment
+### Payment-First Enrollment & Post-Payment Onboarding
 
 ```
-User selects Course and Batch in Marketplace
+Visitor clicks 'Enroll Now' on Landing / Course Page
         ↓
-Check Redis Cache
+Opens lightweight EnrollModal (Full Name + Email + Accuracy Warning)
         ↓
-Cache Miss
+Server creates durable `purchases` record (status: 'created', sessionToken, high-entropy recovery hash)
         ↓
-System checks Seat Availability via Convex Query
+Server sets HttpOnly secure session cookie and redirects to /checkout?purchaseId=...
         ↓
-Store Response in Redis
+Checkout renders course, validates coupons against server rules, displays final amount (No pre-auth required)
         ↓
-User initiates Checkout
+Razorpay Order created via /api/checkout/order bound to purchaseId (Zero tokens exposed in order notes)
         ↓
-Razorpay Order created via Server Action
+Visitor pays via Razorpay modal
         ↓
-User completes payment on Razorpay checkout
+Dual-channel verification: /api/checkout/verify OR /api/webhooks/razorpay
         ↓
-Razorpay Webhook fires (app/api/webhooks/razorpay)
+Convex mutation verifies signature, validates amount, sets purchase paymentStatus: 'verified', guarantees seat
         ↓
-Check Redis for Webhook Idempotency (Deduplication)
+Visitor redirected to protected /checkout/onboarding (guarded strictly by server purchase session)
         ↓
-Convex Mutation verifies signature, deducts seat, creates Enrollment
+Step 1: Buyer confirms/corrects name & email before email dispatch
+Step 2: Optional WhatsApp community invitation (non-blocking)
+Step 3: Completion confirmation & notification that access instructions are sent
         ↓
-Invalidate Redis Cache for Course/Batch
+Durable email outbox job (`emailJobs`) dispatched via Resend with secure claim & recovery link
         ↓
-Resend sends Welcome Email with WhatsApp Group Link
-```
-
-### Automatic Batch Assignment
-
-```
-User initiates Checkout without selecting a specific Batch
+Student signs in or registers via Clerk (Authentication occurs AFTER payment)
         ↓
-Convex Action fetches most recent active Batch with available seats
+Backend strictly verifies Clerk authenticated user's verified email matches purchase.buyerEmail
         ↓
-Assigns Batch ID to checkout session
-        ↓
-Continues standard Enrollment & Payment flow
+Convex links purchase (claimStatus: 'claimed'), creates active enrollment, grants course dashboard access
 ```
 
 ### Dashboard Access & Study Materials

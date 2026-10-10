@@ -869,3 +869,68 @@ export const getStudentAttendanceForSession = query({
       .first();
   },
 });
+
+export const recordStudentSession = mutation({
+  args: {
+    ipHash: v.string(),
+    device: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { logged: false };
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return { logged: false };
+
+    const now = Date.now();
+    const existingSecurity = user.security || {
+      lastLogin: now,
+      ip: "redacted",
+      device: args.device,
+      mfaEnabled: false,
+      verificationStatus: "Verified",
+    };
+
+    const activeSessions = (existingSecurity.activeSessions || []).filter(
+      (s) => now - s.lastSeen < 24 * 60 * 60 * 1000
+    );
+
+    const existingIndex = activeSessions.findIndex(
+      (s) => s.ipHash === args.ipHash && s.device === args.device
+    );
+
+    if (existingIndex >= 0) {
+      activeSessions[existingIndex].lastSeen = now;
+    } else {
+      activeSessions.push({
+        ipHash: args.ipHash,
+        device: args.device,
+        lastSeen: now,
+      });
+    }
+
+    // Flag if more than 3 distinct IP subnets are concurrently active within 15 minutes
+    const recentDistinctIps = new Set(
+      activeSessions
+        .filter((s) => now - s.lastSeen < 15 * 60 * 1000)
+        .map((s) => s.ipHash)
+    );
+
+    const flaggedSharing = recentDistinctIps.size > 3;
+
+    await ctx.db.patch(user._id, {
+      security: {
+        ...existingSecurity,
+        lastLogin: now,
+        activeSessions,
+        flaggedSharing: flaggedSharing || existingSecurity.flaggedSharing,
+      },
+    });
+
+    return { logged: true, flaggedSharing };
+  },
+});
+
