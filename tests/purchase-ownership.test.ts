@@ -43,7 +43,7 @@ interface Course {
 
 interface Coupon {
   code: string;
-  discountType: "percentage" | "fixed";
+  discountType: "percentage" | "fixed" | "fixed_price";
   discountValue: number;
   minPurchaseAmount?: number;
   maxDiscountAmount?: number;
@@ -66,6 +66,8 @@ function calculateServerPrice(
           if (coupon.maxDiscountAmount) {
             discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
           }
+        } else if (coupon.discountType === "fixed_price") {
+          discountAmount = Math.max(0, originalPrice - coupon.discountValue);
         } else if (coupon.discountType === "fixed") {
           discountAmount = Math.min(originalPrice, coupon.discountValue);
         }
@@ -268,6 +270,34 @@ describe("VibeLogic Studio — Secure Purchase Ownership & Access Control", () =
       const pricing = calculateServerPrice(course, expiredCoupon);
       assert.equal(pricing.discountAmount, 0);
       assert.equal(pricing.finalPayable, 4999);
+    });
+
+    it("should reduce price to exactly 10 rupees using fixed_price coupon", () => {
+      const course999: Course = { id: "c2", price: 999 };
+      const coupon10: Coupon = {
+        code: "TEST10",
+        discountType: "fixed_price",
+        discountValue: 10,
+        isActive: true,
+      };
+      const pricing = calculateServerPrice(course999, coupon10);
+      assert.equal(pricing.originalPrice, 999);
+      assert.equal(pricing.discountAmount, 989);
+      assert.equal(pricing.finalPayable, 10);
+    });
+
+    it("should reduce price to 10 rupees using fixed discount coupon of 989 on 999 course", () => {
+      const course999: Course = { id: "c2", price: 999 };
+      const fixedCoupon: Coupon = {
+        code: "VIBE10",
+        discountType: "fixed",
+        discountValue: 989,
+        isActive: true,
+      };
+      const pricing = calculateServerPrice(course999, fixedCoupon);
+      assert.equal(pricing.originalPrice, 999);
+      assert.equal(pricing.discountAmount, 989);
+      assert.equal(pricing.finalPayable, 10);
     });
   });
 

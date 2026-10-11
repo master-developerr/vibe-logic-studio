@@ -47,6 +47,8 @@ export const validateCoupon = query({
       if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
         discountAmount = coupon.maxDiscountAmount;
       }
+    } else if (coupon.discountType === "fixed_price") {
+      discountAmount = Math.max(0, args.currentAmount - coupon.discountValue);
     } else {
       discountAmount = coupon.discountValue;
     }
@@ -107,6 +109,8 @@ export const applyCouponToPurchase = mutation({
       if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
         discountAmount = coupon.maxDiscountAmount;
       }
+    } else if (coupon.discountType === "fixed_price") {
+      discountAmount = Math.max(0, purchase.originalPrice - coupon.discountValue);
     } else {
       discountAmount = coupon.discountValue;
     }
@@ -129,3 +133,65 @@ export const applyCouponToPurchase = mutation({
     };
   },
 });
+
+export const upsertCoupon = mutation({
+  args: {
+    code: v.string(),
+    discountType: v.string(), // "percentage" | "fixed" | "fixed_price"
+    discountValue: v.number(),
+    courseId: v.optional(v.id("courses")),
+    minPurchaseAmount: v.optional(v.number()),
+    maxDiscountAmount: v.optional(v.number()),
+    usageLimit: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const normalizedCode = args.code.trim().toUpperCase();
+    if (!normalizedCode) throw new Error("Coupon code is required");
+
+    const existing = await ctx.db
+      .query("coupons")
+      .withIndex("by_code", (q) => q.eq("code", normalizedCode))
+      .first();
+
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        discountType: args.discountType,
+        discountValue: args.discountValue,
+        courseId: args.courseId,
+        minPurchaseAmount: args.minPurchaseAmount,
+        maxDiscountAmount: args.maxDiscountAmount,
+        usageLimit: args.usageLimit,
+        expiresAt: args.expiresAt,
+        isActive: args.isActive,
+      });
+      return { success: true, couponId: existing._id, action: "updated" };
+    }
+
+    const couponId = await ctx.db.insert("coupons", {
+      code: normalizedCode,
+      discountType: args.discountType,
+      discountValue: args.discountValue,
+      courseId: args.courseId,
+      minPurchaseAmount: args.minPurchaseAmount,
+      maxDiscountAmount: args.maxDiscountAmount,
+      usageLimit: args.usageLimit,
+      usageCount: 0,
+      expiresAt: args.expiresAt,
+      isActive: args.isActive,
+      createdAt: now,
+    });
+
+    return { success: true, couponId, action: "created" };
+  },
+});
+
+export const listCoupons = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("coupons").collect();
+  },
+});
+
