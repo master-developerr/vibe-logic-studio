@@ -31,9 +31,13 @@ export default async function CheckoutPage({
 
   // Fallback to course by slug if direct navigation
   const targetCourseQuery =
-    purchase?.course.slug || params.courseSlug || params.courseId || "build-software-with-ai";
+    purchase?.course.slug || params.courseSlug || params.courseId || "ai-build-sprint";
 
-  const course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
+  let course = await fetchQuery(api.courses.getBySlug, { slug: targetCourseQuery });
+  if (!course && (targetCourseQuery === "ai-build-sprint" || targetCourseQuery === "build-software-with-ai")) {
+    const altSlug = targetCourseQuery === "ai-build-sprint" ? "build-software-with-ai" : "ai-build-sprint";
+    course = await fetchQuery(api.courses.getBySlug, { slug: altSlug });
+  }
   if (!course) {
     return (
       <main className="min-h-screen bg-background py-16 px-4 text-center">

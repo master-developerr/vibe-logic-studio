@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Path B: Authenticated student checkout (if courseSlug or courseId is provided)
-    const targetSlug = courseSlug || courseId || "build-software-with-ai";
+    const targetSlug = courseSlug || courseId || "ai-build-sprint";
     const { userId: clerkId, getToken } = await auth();
 
     if (!clerkId) {
@@ -136,7 +136,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const course = await fetchQuery(api.courses.getBySlug, { slug: targetSlug });
+    let course = await fetchQuery(api.courses.getBySlug, { slug: targetSlug });
+    if (!course && (targetSlug === "ai-build-sprint" || targetSlug === "build-software-with-ai")) {
+      const altSlug = targetSlug === "ai-build-sprint" ? "build-software-with-ai" : "ai-build-sprint";
+      course = await fetchQuery(api.courses.getBySlug, { slug: altSlug });
+    }
+
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }

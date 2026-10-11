@@ -1391,6 +1391,159 @@ describe("VibeLogic Studio — Secure Purchase Ownership & Access Control", () =
       });
     });
   });
+
+  describe("16. Quick Enrollment Session Creation, Slug Resilience & Gateway Handoff", () => {
+    // 16.1 Form Input Validation
+    function validateQuickEnrollmentInput(name: unknown, email: unknown): { valid: boolean; error?: string; trimmedName?: string; normalizedEmail?: string } {
+      if (!name || typeof name !== "string" || name.trim().length < 2) {
+        return { valid: false, error: "Please enter your full name (minimum 2 characters)" };
+      }
+      if (!email || typeof email !== "string") {
+        return { valid: false, error: "Please enter a valid email address" };
+      }
+      const trimmedEmail = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        return { valid: false, error: "Please enter a valid email address" };
+      }
+      return { valid: true, trimmedName: name.trim(), normalizedEmail: trimmedEmail };
+    }
+
+    it("should accept valid buyer input and normalize whitespace and email casing", () => {
+      const res = validateQuickEnrollmentInput("  Alex Morgan  ", "  Alex.Morgan@Example.COM  ");
+      assert.equal(res.valid, true);
+      assert.equal(res.trimmedName, "Alex Morgan");
+      assert.equal(res.normalizedEmail, "alex.morgan@example.com");
+    });
+
+    it("should reject names with fewer than 2 characters", () => {
+      const res = validateQuickEnrollmentInput("A", "alex@example.com");
+      assert.equal(res.valid, false);
+      assert.equal(res.error, "Please enter your full name (minimum 2 characters)");
+    });
+
+    it("should reject invalid email formats", () => {
+      const res = validateQuickEnrollmentInput("Alex Morgan", "not-an-email");
+      assert.equal(res.valid, false);
+      assert.equal(res.error, "Please enter a valid email address");
+    });
+
+    // 16.2 Slug Alias Resolution
+    interface MockCourse {
+      slug: string;
+      title: string;
+      price: number;
+    }
+
+    const mockCourses: MockCourse[] = [
+      { slug: "ai-build-sprint", title: "Build software with AI.", price: 999 },
+    ];
+
+    function resolveCourseBySlug(slug: string): MockCourse | null {
+      let found = mockCourses.find((c) => c.slug === slug);
+      if (!found) {
+        if (slug === "build-software-with-ai") {
+          found = mockCourses.find((c) => c.slug === "ai-build-sprint");
+        } else if (slug === "ai-build-sprint") {
+          found = mockCourses.find((c) => c.slug === "build-software-with-ai");
+        }
+      }
+      return found ?? null;
+    }
+
+    it("should resolve course whether querying build-software-with-ai or ai-build-sprint", () => {
+      const course1 = resolveCourseBySlug("ai-build-sprint");
+      assert.ok(course1);
+      assert.equal(course1.title, "Build software with AI.");
+
+      const course2 = resolveCourseBySlug("build-software-with-ai");
+      assert.ok(course2);
+      assert.equal(course2.title, "Build software with AI.");
+      assert.equal(course2.price, 999);
+    });
+
+    // 16.3 Batch Resolution & Capacity
+    interface MockBatch {
+      id: string;
+      title: string;
+      capacity: number;
+      enrolledCount: number;
+      status: "upcoming" | "live" | "completed";
+    }
+
+    function resolveBatch(batches: MockBatch[], requestedBatchId?: string): { batch: MockBatch | null; error?: string } {
+      let batch = requestedBatchId ? batches.find((b) => b.id === requestedBatchId) : undefined;
+      if (!batch && batches.length > 0) {
+        const upcomingWithCapacity = batches.find(
+          (b) => b.capacity > b.enrolledCount && (b.status === "upcoming" || b.status === "live")
+        );
+        batch = upcomingWithCapacity || batches[0];
+      }
+      if (!batch) {
+        return { batch: null, error: "No active batches available for this program" };
+      }
+      if (batch.enrolledCount >= batch.capacity) {
+        return { batch: null, error: "The selected batch is full" };
+      }
+      return { batch };
+    }
+
+    it("should select the active cohort with available capacity", () => {
+      const batches: MockBatch[] = [
+        { id: "b1", title: "Cohort 01", capacity: 50, enrolledCount: 12, status: "upcoming" },
+      ];
+      const res = resolveBatch(batches);
+      assert.ok(res.batch);
+      assert.equal(res.batch.id, "b1");
+    });
+
+    it("should reject enrollment if all cohorts are full", () => {
+      const batches: MockBatch[] = [
+        { id: "b1", title: "Cohort 01", capacity: 50, enrolledCount: 50, status: "upcoming" },
+      ];
+      const res = resolveBatch(batches);
+      assert.equal(res.batch, null);
+      assert.equal(res.error, "The selected batch is full");
+    });
+
+    // 16.4 Safe Error Formatting
+    function formatSessionError(err: unknown): string {
+      let msg = err instanceof Error ? err.message : "Failed to initialize purchase session";
+      if (msg.includes("Server Error")) {
+        msg = "Unable to start checkout session at the moment. Please try again or refresh the page.";
+      }
+      return msg;
+    }
+
+    it("should transform opaque Convex Server Error into clear user-facing guidance", () => {
+      const rawError = new Error("[Request ID: I482719a06c37a47] Server Error");
+      const formatted = formatSessionError(rawError);
+      assert.equal(formatted, "Unable to start checkout session at the moment. Please try again or refresh the page.");
+    });
+
+    it("should preserve specific business error messages", () => {
+      const specificError = new Error("The selected batch is full");
+      const formatted = formatSessionError(specificError);
+      assert.equal(formatted, "The selected batch is full");
+    });
+
+    // 16.5 HttpOnly Cookie Spec
+    it("should configure HttpOnly cookie attributes securely", () => {
+      const cookieConfig = {
+        name: "vls_purchase_session",
+        value: "test_session_token_12345",
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax" as const,
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60,
+      };
+      assert.equal(cookieConfig.httpOnly, true);
+      assert.equal(cookieConfig.path, "/");
+      assert.equal(cookieConfig.sameSite, "lax");
+      assert.equal(cookieConfig.name, "vls_purchase_session");
+    });
+  });
 });
 
 

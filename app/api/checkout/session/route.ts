@@ -22,8 +22,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
     }
 
-    const targetSlug = courseSlug || courseId || "build-software-with-ai";
-    const course = await fetchQuery(api.courses.getBySlug, { slug: targetSlug });
+    const targetSlug = courseSlug || courseId || "ai-build-sprint";
+    let course = await fetchQuery(api.courses.getBySlug, { slug: targetSlug });
+
+    if (!course && (targetSlug === "ai-build-sprint" || targetSlug === "build-software-with-ai")) {
+      const altSlug = targetSlug === "ai-build-sprint" ? "build-software-with-ai" : "ai-build-sprint";
+      course = await fetchQuery(api.courses.getBySlug, { slug: altSlug });
+    }
 
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
@@ -74,7 +79,10 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error: unknown) {
     console.error("[CheckoutSessionAPI] Error:", error);
-    const msg = error instanceof Error ? error.message : "Failed to initialize purchase session";
+    let msg = error instanceof Error ? error.message : "Failed to initialize purchase session";
+    if (msg.includes("Server Error")) {
+      msg = "Unable to start checkout session at the moment. Please try again or refresh the page.";
+    }
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
