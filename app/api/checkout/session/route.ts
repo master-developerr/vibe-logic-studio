@@ -5,6 +5,7 @@ import { generateSecureTokens, setPurchaseSessionOnResponse } from "@/lib/purcha
 import type { Id } from "@/convex/_generated/dataModel";
 
 export async function POST(req: NextRequest) {
+  let targetSlug = "ai-build-sprint";
   try {
     const body = await req.json();
     const { buyerName, buyerEmail, courseSlug, courseId, batchId: requestedBatchId } = body;
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
     }
 
-    const targetSlug = courseSlug || courseId || "ai-build-sprint";
+    targetSlug = courseSlug || courseId || "ai-build-sprint";
     let course = await fetchQuery(api.courses.getBySlug, { slug: targetSlug });
 
     if (!course && (targetSlug === "ai-build-sprint" || targetSlug === "build-software-with-ai")) {
@@ -78,7 +79,11 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: unknown) {
-    console.error("[CheckoutSessionAPI] Error:", error);
+    console.error("[CheckoutSessionAPI] Failed to initialize purchase session:", {
+      targetSlug,
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     let msg = error instanceof Error ? error.message : "Failed to initialize purchase session";
     if (msg.includes("Server Error")) {
       msg = "Unable to start checkout session at the moment. Please try again or refresh the page.";

@@ -203,7 +203,26 @@ export async function POST(req: NextRequest) {
       price: course.price,
     });
   } catch (error: unknown) {
-    console.error("[CheckoutOrder] Order creation error:", error);
+    const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim() || "";
+    const keyMode = key_id.startsWith("rzp_live_")
+      ? "live"
+      : key_id.startsWith("rzp_test_")
+      ? "test"
+      : "unknown";
+
+    console.error("[CheckoutOrder] Order creation error:", {
+      keyMode,
+      keyPrefix: key_id ? key_id.slice(0, 8) : "missing",
+      hasSecret: !!process.env.RAZORPAY_KEY_SECRET,
+      errorDetails:
+        typeof error === "object" && error !== null
+          ? {
+              statusCode: (error as { statusCode?: number }).statusCode,
+              error: (error as { error?: unknown }).error,
+              message: (error as Error).message,
+            }
+          : String(error),
+    });
     const msg = extractRazorpayError(error);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
