@@ -76,8 +76,15 @@ export async function sendWelcomeAccessEmail({
     const data = await res.json();
 
     if (!res.ok) {
-      console.error("[Resend] API Error:", data);
-      return { success: false, error: data.message || "Failed to deliver email" };
+      const errorMsg = data.message || "Failed to deliver email";
+      if (res.status === 403) {
+        console.error(
+          `[Resend] Authorization/Domain Error (HTTP 403): ${errorMsg}. Ensure your domain is verified at https://resend.com/domains or use RESEND_FROM_EMAIL="onboarding@resend.dev" for test accounts.`
+        );
+      } else {
+        console.error("[Resend] API Error:", data);
+      }
+      return { success: false, error: errorMsg };
     }
 
     return { success: true, messageId: data.id };

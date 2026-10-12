@@ -6,6 +6,7 @@ import { verifyRazorpayPaymentSignature } from "@/lib/razorpay";
 import { getPurchaseSessionFromCookies } from "@/lib/purchase-session";
 import type { Id } from "@/convex/_generated/dataModel";
 import { invalidatePurchaseRelatedCaches } from "@/lib/course-cache";
+import { dispatchPurchaseEmail } from "@/lib/email-dispatch-service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -73,6 +74,16 @@ export async function POST(req: NextRequest) {
         courseSlug: result.courseSlug || purchase.course.slug,
         courseId: result.courseId || purchase.course.id,
         batchId: result.batchId || purchase.batch.id,
+      });
+
+      // Resolve base URL for email portal recovery link
+      const host = req.headers.get("host") || "localhost:3000";
+      const protocol = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+
+      // Automatically dispatch transactional welcome email in background (non-blocking)
+      dispatchPurchaseEmail(purchase.purchaseId, baseUrl).catch((err) => {
+        console.error("[CheckoutVerify] Background email dispatch failed:", err);
       });
 
       return NextResponse.json({

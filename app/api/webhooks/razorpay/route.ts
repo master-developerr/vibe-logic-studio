@@ -5,6 +5,7 @@ import { api, internal } from "@/convex/_generated/api";
 import { redis } from "@/lib/redis";
 import { Id } from "@/convex/_generated/dataModel";
 import { invalidatePurchaseRelatedCaches } from "@/lib/course-cache";
+import { dispatchPurchaseEmail } from "@/lib/email-dispatch-service";
 
 export async function POST(req: NextRequest) {
   let rawBody = "";
@@ -105,6 +106,15 @@ export async function POST(req: NextRequest) {
           courseId: result.courseId,
           batchId: result.batchId,
           clerkId: notes?.clerkId,
+        });
+
+        // Resolve base URL and trigger asynchronous email dispatch
+        const host = req.headers.get("host") || "localhost:3000";
+        const protocol = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+
+        dispatchPurchaseEmail(notes.purchaseId, baseUrl).catch((err) => {
+          console.error("[RazorpayWebhook] Background email dispatch failed:", err);
         });
       } else if (notes?.clerkId && notes?.courseId && notes?.batchId) {
         // Legacy authenticated checkout flow

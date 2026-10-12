@@ -213,6 +213,12 @@ export function CheckoutClient({
         throw new Error(orderData.error || "Failed to initialize payment order");
       }
 
+      // Check if order was directly fulfilled for 100% OFF free coupon
+      if (orderData.free && orderData.onboardingUrl) {
+        window.location.href = orderData.onboardingUrl;
+        return;
+      }
+
       // 3. Launch Razorpay modal
       const options = {
         key: orderData.keyId,
@@ -384,11 +390,13 @@ export function CheckoutClient({
       <div className="space-y-2.5 pt-0.5">
         <button
           onClick={handlePayment}
-          disabled={isPending || !sdkLoaded}
+          disabled={isPending || (finalPayable > 0 && !sdkLoaded)}
           className="w-full flex h-12 md:h-12.5 items-center justify-between rounded-full bg-[#FF5A1F] hover:bg-[#E64A19] text-white pl-5 pr-1.5 text-xs md:text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed select-none transition-all cursor-pointer"
         >
           <span className="tracking-tight">
-            {isPending ? "Connecting Payment Gateway..." : "Proceed to Payment"}
+            {isPending
+              ? (finalPayable === 0 ? "Claiming Free Access..." : "Connecting Payment Gateway...")
+              : (finalPayable === 0 ? "Complete Free Enrollment (100% OFF) →" : "Proceed to Payment")}
           </span>
           <span className="flex size-9 items-center justify-center rounded-full bg-white/10 shrink-0">
             {isPending ? (

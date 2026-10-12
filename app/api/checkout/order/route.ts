@@ -5,6 +5,8 @@ import { fetchQuery, fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getPurchaseSessionFromCookies } from "@/lib/purchase-session";
 import type { Id } from "@/convex/_generated/dataModel";
+import { invalidatePurchaseRelatedCaches } from "@/lib/course-cache";
+import { dispatchPurchaseEmail } from "@/lib/email-dispatch-service";
 
 function extractRazorpayError(error: unknown): string {
   if (typeof error === "object" && error !== null) {
@@ -89,6 +91,39 @@ export async function POST(req: NextRequest) {
           { error: "The selected batch is full. Please choose another cohort." },
           { status: 400 }
         );
+      }
+
+      // Path A1: 100% OFF (free coupon) direct fulfillment without payment gateway
+      if (purchase.amount === 0) {
+        const freeId = `free_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const result = await fetchMutation(api.payments.fulfillPurchasePayment, {
+          purchaseId: purchase.purchaseId,
+          razorpayOrderId: freeId,
+          razorpayPaymentId: freeId,
+          amount: 0,
+          paymentMethod: "100% OFF Coupon",
+          gateway: "Coupon",
+        });
+
+        await invalidatePurchaseRelatedCaches({
+          courseSlug: result.courseSlug || purchase.course.slug,
+          courseId: result.courseId || purchase.course.id,
+          batchId: result.batchId || purchase.batch.id,
+        });
+
+        const host = req.headers.get("host") || "localhost:3000";
+        const protocol = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+
+        dispatchPurchaseEmail(purchase.purchaseId, baseUrl).catch((err) => {
+          console.error("[CheckoutOrder] Free purchase email dispatch failed:", err);
+        });
+
+        return NextResponse.json({
+          free: true,
+          purchaseId: purchase.purchaseId,
+          onboardingUrl: `/checkout/onboarding?purchaseId=${purchase.purchaseId}`,
+        });
       }
 
       const amountInPaise = Math.round(purchase.amount * 100);
