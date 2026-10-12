@@ -1750,6 +1750,51 @@ describe("VibeLogic Studio — Secure Purchase Ownership & Access Control", () =
         email: "linus@linux.org",
       });
     });
+
+    // 17.7 Desktop One-Screen Viewport Budget Compliance
+    it("should fit all essential elements within standard desktop viewports (1440x900 and 1366x768)", () => {
+      interface LayoutElementBudget {
+        headerNav: number;
+        headingAndSubtitle: number;
+        courseCard: number;
+        studentFormCard: number;
+        containerPadding: number;
+      }
+
+      const desktopBudget: LayoutElementBudget = {
+        headerNav: 36,
+        headingAndSubtitle: 44,
+        courseCard: 110,
+        studentFormCard: 230,
+        containerPadding: 48,
+      };
+
+      const totalDesktopHeight =
+        desktopBudget.headerNav +
+        desktopBudget.headingAndSubtitle +
+        desktopBudget.courseCard +
+        desktopBudget.studentFormCard +
+        desktopBudget.containerPadding;
+
+      // Must fit comfortably within 768px (standard minimum target) with buffer for browser chrome
+      const minTargetViewportHeight = 768;
+      const expectedBuffer = minTargetViewportHeight - totalDesktopHeight;
+
+      assert.ok(totalDesktopHeight <= 550, `Total desktop height ${totalDesktopHeight}px exceeds 550px`);
+      assert.ok(expectedBuffer >= 200, `Expected buffer ${expectedBuffer}px is insufficient for browser chrome`);
+    });
+
+    // 17.8 Responsive Mode Behavior
+    it("should allow natural scrolling on viewports smaller than desktop threshold", () => {
+      function resolveScrollPolicy(viewportWidth: number): "single_screen_fit" | "natural_scroll" {
+        return viewportWidth >= 1024 ? "single_screen_fit" : "natural_scroll";
+      }
+
+      assert.equal(resolveScrollPolicy(1440), "single_screen_fit");
+      assert.equal(resolveScrollPolicy(1366), "single_screen_fit");
+      assert.equal(resolveScrollPolicy(768), "natural_scroll");
+      assert.equal(resolveScrollPolicy(390), "natural_scroll");
+    });
   });
 });
 

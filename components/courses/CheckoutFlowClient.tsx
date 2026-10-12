@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Id } from "@/convex/_generated/dataModel";
 import { CheckoutClient } from "./CheckoutClient";
-import { Calendar, User, Mail, Sparkles, ShieldAlert, AlertCircle } from "lucide-react";
+import { Calendar, User, Sparkles, ShieldAlert, AlertCircle } from "lucide-react";
 
 type CheckoutFlowClientProps = {
   course: {
@@ -70,47 +70,49 @@ export function CheckoutFlowClient({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-7 items-start">
       {/* Left Column: Course details & Embedded Student Form */}
-      <div className="lg:col-span-7 space-y-6 text-left">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-extrabold text-text-primary tracking-tight">
+      <div className="lg:col-span-7 space-y-3.5 md:space-y-4 text-left">
+        <div className="space-y-0.5">
+          <h1 className="text-xl md:text-2xl font-bold text-text-primary tracking-tight">
             Review & Finalize Order
           </h1>
-          <p className="text-sm text-text-secondary leading-relaxed">
+          <p className="text-xs text-text-secondary leading-normal">
             Confirm your student details and cohort schedule before proceeding to payment.
           </p>
         </div>
 
-        {/* Course & Cohort Batch Card */}
-        <div className="p-6 md:p-7 bg-surface border border-border rounded-3xl space-y-5 shadow-sm text-left">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary inline-flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3" />
+        {/* Course & Cohort Batch Card (Compact) */}
+        <div className="p-4 md:p-5 bg-surface border border-border rounded-2xl md:rounded-3xl space-y-3 shadow-sm text-left">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary inline-flex items-center gap-1 bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+              <Sparkles className="w-2.5 h-2.5" />
               {course.category}
             </span>
-            <h2 className="text-xl md:text-2xl font-bold text-text-primary">
-              {course.title}
-            </h2>
+            <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+              Cohort Schedule
+            </span>
           </div>
 
-          <div className="h-px bg-border/60" />
+          <h2 className="text-base md:text-lg font-bold text-text-primary leading-snug">
+            {course.title}
+          </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+          <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+            <div className="px-3 py-2 rounded-xl bg-background/50 border border-border/40">
+              <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider">
                 Cohort Batch
               </p>
-              <p className="text-sm font-semibold text-text-primary mt-1">
+              <p className="text-xs font-semibold text-text-primary mt-0.5 truncate">
                 {batch.title}
               </p>
             </div>
-            <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
+            <div className="px-3 py-2 rounded-xl bg-background/50 border border-border/40">
+              <p className="text-[9px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1">
+                <Calendar className="w-2.5 h-2.5" />
                 Start Date
               </p>
-              <p className="text-sm font-semibold text-text-primary mt-1">
+              <p className="text-xs font-semibold text-text-primary mt-0.5">
                 {new Date(batch.startDate).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "short",
@@ -121,25 +123,23 @@ export function CheckoutFlowClient({
           </div>
         </div>
 
-        {/* Embedded Student Information Card */}
-        <div className="p-6 md:p-7 bg-surface border border-border rounded-3xl space-y-5 shadow-sm text-left">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">
+        {/* Embedded Student Information Card (Compact) */}
+        <div className="p-4 md:p-5 bg-surface border border-border rounded-2xl md:rounded-3xl space-y-3 shadow-sm text-left">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-primary" />
+              <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">
                 Student Information
               </h3>
             </div>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Enter your student details below. No account creation or password needed right now.
-            </p>
+            <span className="text-[10px] text-text-muted">No password needed</span>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             <div>
               <label 
                 htmlFor="checkout-full-name"
-                className="block text-[11px] font-bold text-text-primary uppercase tracking-wider mb-1.5"
+                className="block text-[10px] font-bold text-text-primary uppercase tracking-wider mb-1"
               >
                 Full Name <span className="text-primary">*</span>
               </label>
@@ -158,14 +158,14 @@ export function CheckoutFlowClient({
                   }
                 }}
                 placeholder="e.g. Alex Morgan"
-                className={`w-full h-12 px-4 rounded-xl border bg-background text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all ${
+                className={`w-full h-10 md:h-11 px-3.5 rounded-xl border bg-background text-xs md:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all ${
                   nameError
                     ? "border-error focus:border-error focus:ring-error/20"
                     : "border-border/80 focus:border-primary focus:ring-primary/20"
                 }`}
               />
               {nameError && (
-                <p className="text-[11px] font-medium text-error mt-1.5 flex items-center gap-1">
+                <p className="text-[10px] font-medium text-error mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" />
                   {nameError}
                 </p>
@@ -175,7 +175,7 @@ export function CheckoutFlowClient({
             <div>
               <label 
                 htmlFor="checkout-email"
-                className="block text-[11px] font-bold text-text-primary uppercase tracking-wider mb-1.5"
+                className="block text-[10px] font-bold text-text-primary uppercase tracking-wider mb-1"
               >
                 Email Address <span className="text-primary">*</span>
               </label>
@@ -195,25 +195,25 @@ export function CheckoutFlowClient({
                   }
                 }}
                 placeholder="alex@example.com"
-                className={`w-full h-12 px-4 rounded-xl border bg-background text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all ${
+                className={`w-full h-10 md:h-11 px-3.5 rounded-xl border bg-background text-xs md:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all ${
                   emailError
                     ? "border-error focus:border-error focus:ring-error/20"
                     : "border-border/80 focus:border-primary focus:ring-primary/20"
                 }`}
               />
               {emailError && (
-                <p className="text-[11px] font-medium text-error mt-1.5 flex items-center gap-1">
+                <p className="text-[10px] font-medium text-error mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" />
                   {emailError}
                 </p>
               )}
             </div>
 
-            {/* Mandatory Email Accuracy Advisory Banner */}
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#FFF8E6] border border-[#F59E0B]/30 text-[#92400E]">
-              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-[#D97706]" />
-              <p className="text-[11px] leading-relaxed">
-                <strong>Make sure your email address is correct.</strong> Your course access instructions, invoice, and dashboard link will be sent to this email. An incorrect email may prevent you from receiving them.
+            {/* Mandatory Email Accuracy Advisory Banner (Compact) */}
+            <div className="flex items-start gap-2 p-2.5 rounded-xl bg-[#FFF8E6] border border-[#F59E0B]/30 text-[#92400E]">
+              <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#D97706]" />
+              <p className="text-[10px] md:text-[11px] leading-tight">
+                <strong>Verify your email:</strong> Your course access instructions, invoice, and LMS credentials will be sent directly to this address.
               </p>
             </div>
           </div>

@@ -101,23 +101,23 @@ export default async function CheckoutPage({
   };
 
   return (
-    <main className="min-h-screen bg-background py-12 md:py-16 px-4 md:px-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <main className="min-h-screen bg-background py-4 md:py-5 lg:py-6 px-4 md:px-6 lg:px-8 flex flex-col lg:justify-center">
+      <div className="w-full max-w-5xl mx-auto space-y-3 md:space-y-4">
         {/* Navigation & Header */}
-        <div className="flex items-center justify-between border-b border-border/60 pb-6">
+        <div className="flex items-center justify-between border-b border-border/60 pb-2.5 md:pb-3">
           <Link
             href={
               course.slug === "build-software-with-ai" || course.slug === "ai-build-sprint"
                 ? "/build-software-with-ai"
                 : "/"
             }
-            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-text-secondary hover:text-text-primary transition-colors"
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-text-secondary hover:text-text-primary transition-colors"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5" />
             Back to Course Details
           </Link>
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.14em] bg-primary/10 text-primary border border-primary/20">
-            <ShieldCheck className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-[0.14em] bg-primary/10 text-primary border border-primary/20">
+            <ShieldCheck className="w-3 h-3" />
             Direct Secure Checkout
           </div>
         </div>

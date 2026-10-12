@@ -289,12 +289,12 @@ export function CheckoutClient({
   const netAmount = finalPayable - taxAmount;
 
   return (
-    <aside className="rounded-[2rem] border border-border/60 bg-surface p-7 shadow-lg space-y-6 text-left">
+    <aside className="rounded-2xl md:rounded-3xl border border-border/60 bg-surface p-4 md:p-5 shadow-sm space-y-3.5 text-left">
       <div>
-        <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider mb-4">
+        <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
           Fee Breakdown
         </h3>
-        <div className="space-y-3 text-sm">
+        <div className="space-y-2 text-xs md:text-sm">
           <div className="flex justify-between items-center text-text-secondary">
             <span>Course Tuition</span>
             <span>₹{originalPrice.toLocaleString("en-IN")}</span>
@@ -320,22 +320,30 @@ export function CheckoutClient({
             <span>₹{taxAmount.toLocaleString("en-IN")}</span>
           </div>
 
-          <div className="h-px bg-border/60 my-2" />
+          <div className="h-px bg-border/60 my-1.5" />
 
-          <div className="flex justify-between items-baseline pt-1">
-            <span className="text-base font-bold text-text-primary">Total Payable</span>
-            <span className="text-2xl font-extrabold text-[#FF5A1F]">
+          <div className="flex justify-between items-baseline pt-0.5">
+            <span className="text-sm font-bold text-text-primary">Total Payable</span>
+            <span className="text-xl md:text-2xl font-extrabold text-[#FF5A1F]">
               ₹{finalPayable.toLocaleString("en-IN")}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Coupon Application Box */}
-      <div className="p-4 rounded-2xl bg-background/60 border border-border/50 space-y-3">
-        <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider">
-          Have a promotional code?
-        </label>
+      {/* Coupon Application Box (Compact) */}
+      <div className="p-3 rounded-xl bg-background/60 border border-border/50 space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+            Promotional Code
+          </label>
+          {couponMessage && (
+            <span className="text-[10px] font-medium text-success flex items-center gap-1">
+              <Check className="w-3 h-3 shrink-0" />
+              Applied
+            </span>
+          )}
+        </div>
         <form onSubmit={handleApplyCoupon} className="flex gap-2">
           <input
             type="text"
@@ -343,12 +351,12 @@ export function CheckoutClient({
             onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
             placeholder="e.g. LAUNCH25"
             disabled={isApplyingCoupon || isPending}
-            className="flex-1 h-10 px-3 rounded-xl border border-border bg-surface text-xs font-mono uppercase text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+            className="flex-1 h-9 px-3 rounded-lg border border-border bg-surface text-xs font-mono uppercase text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
           />
           <button
             type="submit"
             disabled={isApplyingCoupon || !couponInput.trim()}
-            className="px-4 h-10 rounded-xl bg-text-primary hover:bg-primary text-white text-xs font-bold disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5"
+            className="px-3.5 h-9 rounded-lg bg-text-primary hover:bg-primary text-white text-xs font-bold disabled:opacity-40 transition-colors flex items-center justify-center gap-1"
           >
             {isApplyingCoupon ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -359,31 +367,30 @@ export function CheckoutClient({
         </form>
 
         {couponMessage && (
-          <p className="text-[11px] font-medium text-success flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 shrink-0" />
+          <p className="text-[10px] font-medium text-success leading-tight">
             {couponMessage}
           </p>
         )}
       </div>
 
       {error && (
-        <div className="p-4 bg-error/10 border border-error/30 text-error text-xs font-medium rounded-xl leading-relaxed flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+        <div className="p-2.5 bg-error/10 border border-error/30 text-error text-xs font-medium rounded-xl leading-relaxed flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Payment CTA */}
-      <div className="space-y-4 pt-1">
+      <div className="space-y-2.5 pt-0.5">
         <button
           onClick={handlePayment}
           disabled={isPending || !sdkLoaded}
-          className="w-full flex h-14 items-center justify-between rounded-full bg-[#FF5A1F] hover:bg-[#E64A19] text-white pl-6 pr-2 text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed select-none transition-all cursor-pointer"
+          className="w-full flex h-12 md:h-12.5 items-center justify-between rounded-full bg-[#FF5A1F] hover:bg-[#E64A19] text-white pl-5 pr-1.5 text-xs md:text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed select-none transition-all cursor-pointer"
         >
           <span className="tracking-tight">
             {isPending ? "Connecting Payment Gateway..." : "Proceed to Payment"}
           </span>
-          <span className="flex size-10 items-center justify-center rounded-full bg-white/10 shrink-0">
+          <span className="flex size-9 items-center justify-center rounded-full bg-white/10 shrink-0">
             {isPending ? (
               <Loader2 className="w-4 h-4 animate-spin text-white" />
             ) : (
@@ -392,10 +399,10 @@ export function CheckoutClient({
           </span>
         </button>
 
-        <div className="flex items-start gap-2 text-[11px] leading-relaxed text-text-secondary">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" strokeWidth={2} />
+        <div className="flex items-center gap-1.5 text-[10px] leading-tight text-text-secondary">
+          <ShieldCheck className="size-3.5 shrink-0 text-success" strokeWidth={2} />
           <span>
-            Payment processed securely by Razorpay. 100% money-back guarantee if you are not satisfied with the course.
+            100% secure checkout via Razorpay · Full refund guarantee
           </span>
         </div>
       </div>
