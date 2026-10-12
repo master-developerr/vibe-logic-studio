@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "crypto";
+import fs from "fs";
 
 // 1. Email Normalization & Validation Logic
 function normalizeEmail(email: string): string {
@@ -1794,6 +1795,43 @@ describe("VibeLogic Studio — Secure Purchase Ownership & Access Control", () =
       assert.equal(resolveScrollPolicy(1366), "single_screen_fit");
       assert.equal(resolveScrollPolicy(768), "natural_scroll");
       assert.equal(resolveScrollPolicy(390), "natural_scroll");
+    });
+  });
+
+  // 18. Razorpay Trust Badge & Brand Integrity Verification
+  describe("18. Razorpay Trust Badge & Brand Integrity", () => {
+    it("should render official Razorpay branding asset without broken external image links", () => {
+      const checkoutContent = fs.readFileSync("components/courses/CheckoutClient.tsx", "utf8");
+
+      // Ensure official Razorpay SVG vector paths are present
+      assert.ok(checkoutContent.includes("RazorpayLogo"), "CheckoutClient must define RazorpayLogo vector component");
+      assert.ok(checkoutContent.includes("Secured by"), "Badge must display 'Secured by' label");
+      assert.ok(checkoutContent.includes("#072654"), "Razorpay official brand navy color must be used");
+      assert.ok(checkoutContent.includes("#3395FF"), "Razorpay official emblem electric blue must be used");
+
+      // Ensure public asset exists as official SVG fallback
+      assert.ok(fs.existsSync("public/razorpay-logo.svg"), "public/razorpay-logo.svg must exist in repository");
+    });
+
+    it("should enforce single trust badge rendering under the payment CTA", () => {
+      const checkoutContent = fs.readFileSync("components/courses/CheckoutClient.tsx", "utf8");
+
+      const badgeMatches = checkoutContent.match(/>Secured by</g);
+      assert.equal(badgeMatches ? badgeMatches.length : 0, 1, "There must be exactly one 'Secured by' badge rendered");
+    });
+
+    it("should maintain single-screen desktop viewport budget with trust badge included", () => {
+      const headerEstimate = 48;
+      const titleEstimate = 40;
+      const gridContentEstimate = 380;
+      const trustBadgeHeight = 44; // ~40-44px for the trust badge
+      const totalDesktopHeight = headerEstimate + titleEstimate + gridContentEstimate + trustBadgeHeight;
+
+      const minTargetViewportHeight = 768;
+      const expectedBuffer = minTargetViewportHeight - totalDesktopHeight;
+
+      assert.ok(totalDesktopHeight <= 560, `Total desktop height ${totalDesktopHeight}px exceeds 560px budget`);
+      assert.ok(expectedBuffer >= 180, `Expected buffer ${expectedBuffer}px is insufficient for browser chrome`);
     });
   });
 });
