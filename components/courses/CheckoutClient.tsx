@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { Loader2, CreditCard, ShieldCheck, Tag, Check, AlertCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 type CheckoutClientProps = {
-  purchaseId: string;
+  purchaseId?: string;
   courseSlug: string;
   batchId: string;
   originalPrice: number;
@@ -14,6 +13,8 @@ type CheckoutClientProps = {
   initialDiscount?: number;
   studentName: string;
   studentEmail: string;
+  onValidateForm: () => { valid: boolean; name: string; email: string };
+  onPurchaseSessionCreated?: (purchaseId: string) => void;
 };
 
 export function CheckoutClient({
@@ -26,8 +27,13 @@ export function CheckoutClient({
   initialDiscount = 0,
   studentName,
   studentEmail,
+  onValidateForm,
+  onPurchaseSessionCreated,
 }: CheckoutClientProps) {
-  const router = useRouter();
+  const [currentPurchaseId, setCurrentPurchaseId] = useState<string | undefined>(purchaseId);
+  const [currentBoundName, setCurrentBoundName] = useState(studentName);
+  const [currentBoundEmail, setCurrentBoundEmail] = useState(studentEmail);
+
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sdkLoaded, setSdkLoaded] = useState(false);
@@ -67,6 +73,13 @@ export function CheckoutClient({
     };
   }, []);
 
+  // Update internal tracking if external props change
+  useEffect(() => {
+    if (purchaseId && purchaseId !== currentPurchaseId) {
+      setCurrentPurchaseId(purchaseId);
+    }
+  }, [purchaseId, currentPurchaseId]);
+
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!couponInput.trim()) return;
@@ -76,11 +89,44 @@ export function CheckoutClient({
     setCouponMessage(null);
 
     try {
+      let activePurchaseId = currentPurchaseId;
+
+      if (!activePurchaseId) {
+        const validation = onValidateForm();
+        if (!validation.valid) {
+          setError("Please enter your full name and email before applying a coupon.");
+          setIsApplyingCoupon(false);
+          return;
+        }
+
+        const sessionRes = await fetch("/api/checkout/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            buyerName: validation.name,
+            buyerEmail: validation.email,
+            courseSlug,
+            batchId,
+          }),
+        });
+
+        const sessionData = await sessionRes.json();
+        if (!sessionRes.ok || !sessionData.purchaseId) {
+          throw new Error(sessionData.error || "Failed to initialize checkout session");
+        }
+
+        activePurchaseId = String(sessionData.purchaseId);
+        setCurrentPurchaseId(activePurchaseId);
+        setCurrentBoundName(validation.name);
+        setCurrentBoundEmail(validation.email);
+        onPurchaseSessionCreated?.(activePurchaseId);
+      }
+
       const res = await fetch("/api/checkout/coupon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          purchaseId,
+          purchaseId: activePurchaseId,
           code: couponInput.trim(),
         }),
       });
@@ -107,16 +153,56 @@ export function CheckoutClient({
       return;
     }
 
+    const validation = onValidateForm();
+    if (!validation.valid) {
+      return;
+    }
+
     setIsPending(true);
     setError(null);
 
     try {
-      // 1. Create order on the server
+      let activePurchaseId = currentPurchaseId;
+
+      // 1. Initialize or update session if needed
+      if (
+        !activePurchaseId ||
+        validation.name !== currentBoundName ||
+        validation.email !== currentBoundEmail
+      ) {
+        const sessionRes = await fetch("/api/checkout/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            buyerName: validation.name,
+            buyerEmail: validation.email,
+            courseSlug,
+            batchId,
+          }),
+        });
+
+        const sessionData = await sessionRes.json();
+        if (!sessionRes.ok || !sessionData.purchaseId) {
+          throw new Error(sessionData.error || "Failed to initialize checkout session");
+        }
+
+        activePurchaseId = String(sessionData.purchaseId);
+        setCurrentPurchaseId(activePurchaseId);
+        setCurrentBoundName(validation.name);
+        setCurrentBoundEmail(validation.email);
+        onPurchaseSessionCreated?.(activePurchaseId);
+      }
+
+      if (!activePurchaseId) {
+        throw new Error("Checkout session is missing or expired. Please try again.");
+      }
+
+      // 2. Create Razorpay order on the server
       const orderRes = await fetch("/api/checkout/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          purchaseId: purchaseId || undefined,
+          purchaseId: activePurchaseId,
           courseSlug,
           batchId,
         }),
@@ -127,7 +213,7 @@ export function CheckoutClient({
         throw new Error(orderData.error || "Failed to initialize payment order");
       }
 
-      // 2. Launch Razorpay modal
+      // 3. Launch Razorpay modal
       const options = {
         key: orderData.keyId,
         amount: orderData.amount,
@@ -141,12 +227,12 @@ export function CheckoutClient({
           razorpay_signature: string;
         }) {
           try {
-            // 3. Verify payment signature on the server
+            // 4. Verify payment signature on the server
             const verifyRes = await fetch("/api/checkout/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                purchaseId: purchaseId || undefined,
+                purchaseId: activePurchaseId,
                 courseSlug,
                 batchId,
                 razorpay_order_id: paymentResponse.razorpay_order_id,
@@ -160,11 +246,11 @@ export function CheckoutClient({
               throw new Error(verifyData.error || "Payment verification failed");
             }
 
-            // 4. Redirect to onboarding or course workspace
+            // 5. Redirect to onboarding or course workspace
             window.location.href =
               verifyData.redirectUrl ||
               verifyData.onboardingUrl ||
-              `/checkout/onboarding?purchaseId=${purchaseId}`;
+              `/checkout/onboarding?purchaseId=${activePurchaseId}`;
           } catch (verifyErr: unknown) {
             console.error("[CheckoutClient] Verification error:", verifyErr);
             setError(
@@ -176,8 +262,8 @@ export function CheckoutClient({
           }
         },
         prefill: {
-          name: studentName,
-          email: studentEmail,
+          name: validation.name,
+          email: validation.email,
         },
         theme: {
           color: "#FF5A1F",
@@ -292,7 +378,7 @@ export function CheckoutClient({
         <button
           onClick={handlePayment}
           disabled={isPending || !sdkLoaded}
-          className="w-full flex h-14 items-center justify-between rounded-full bg-[#FF5A1F] hover:bg-[#E64A19] text-white pl-6 pr-2 text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed select-none transition-all"
+          className="w-full flex h-14 items-center justify-between rounded-full bg-[#FF5A1F] hover:bg-[#E64A19] text-white pl-6 pr-2 text-sm font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed select-none transition-all cursor-pointer"
         >
           <span className="tracking-tight">
             {isPending ? "Connecting Payment Gateway..." : "Proceed to Payment"}

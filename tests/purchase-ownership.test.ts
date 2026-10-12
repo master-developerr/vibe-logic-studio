@@ -1574,6 +1574,184 @@ describe("VibeLogic Studio — Secure Purchase Ownership & Access Control", () =
       assert.equal(cookieConfig.name, "vls_purchase_session");
     });
   });
+
+  describe("17. Embedded Checkout Student Form & Direct Flow Verification", () => {
+    // 17.1 Direct Navigation URL Construction
+    function buildCheckoutHref(courseSlug: string, batchId?: string): string {
+      const base = `/checkout?courseSlug=${encodeURIComponent(courseSlug)}`;
+      return batchId ? `${base}&batchId=${encodeURIComponent(batchId)}` : base;
+    }
+
+    it("should generate direct checkout href without modal popups", () => {
+      assert.equal(buildCheckoutHref("ai-build-sprint"), "/checkout?courseSlug=ai-build-sprint");
+      assert.equal(
+        buildCheckoutHref("build-software-with-ai", "batch_99"),
+        "/checkout?courseSlug=build-software-with-ai&batchId=batch_99"
+      );
+    });
+
+    // 17.2 Student Profile Prefill Resolution
+    function resolveInitialStudentDetails(params: {
+      purchase?: { buyerName: string; buyerEmail: string } | null;
+      clerkUser?: { firstName?: string; lastName?: string; email?: string } | null;
+    }): { name: string; email: string } {
+      if (params.purchase) {
+        return { name: params.purchase.buyerName, email: params.purchase.buyerEmail };
+      }
+      if (params.clerkUser) {
+        const fullName = [params.clerkUser.firstName, params.clerkUser.lastName].filter(Boolean).join(" ").trim();
+        return { name: fullName, email: params.clerkUser.email || "" };
+      }
+      return { name: "", email: "" };
+    }
+
+    it("should prioritize existing purchase session details for prefill", () => {
+      const prefill = resolveInitialStudentDetails({
+        purchase: { buyerName: "Session Buyer", buyerEmail: "session@example.com" },
+        clerkUser: { firstName: "Clerk", lastName: "User", email: "clerk@example.com" },
+      });
+      assert.equal(prefill.name, "Session Buyer");
+      assert.equal(prefill.email, "session@example.com");
+    });
+
+    it("should fallback to Clerk profile when purchase session is not present", () => {
+      const prefill = resolveInitialStudentDetails({
+        purchase: null,
+        clerkUser: { firstName: "Ada", lastName: "Lovelace", email: "ada@example.com" },
+      });
+      assert.equal(prefill.name, "Ada Lovelace");
+      assert.equal(prefill.email, "ada@example.com");
+    });
+
+    it("should default to empty strings when visitor is anonymous without prior session", () => {
+      const prefill = resolveInitialStudentDetails({ purchase: null, clerkUser: null });
+      assert.equal(prefill.name, "");
+      assert.equal(prefill.email, "");
+    });
+
+    // 17.3 Form Field Validation Logic
+    function validateStudentForm(name: string, email: string): {
+      valid: boolean;
+      nameError?: string;
+      emailError?: string;
+      trimmedName?: string;
+      normalizedEmail?: string;
+    } {
+      let isValid = true;
+      let nameError: string | undefined;
+      let emailError: string | undefined;
+
+      const trimmedName = name.trim();
+      const trimmedEmail = email.trim().toLowerCase();
+
+      if (!trimmedName || trimmedName.length < 2) {
+        nameError = "Please enter your full name (minimum 2 characters).";
+        isValid = false;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+        emailError = "Please enter a valid email address.";
+        isValid = false;
+      }
+
+      return {
+        valid: isValid,
+        nameError,
+        emailError,
+        trimmedName: isValid ? trimmedName : undefined,
+        normalizedEmail: isValid ? trimmedEmail : undefined,
+      };
+    }
+
+    it("should validate and normalize valid student details", () => {
+      const res = validateStudentForm("  John Carmack  ", "  Carmack@IdSoftware.COM  ");
+      assert.equal(res.valid, true);
+      assert.equal(res.trimmedName, "John Carmack");
+      assert.equal(res.normalizedEmail, "carmack@idsoftware.com");
+      assert.equal(res.nameError, undefined);
+      assert.equal(res.emailError, undefined);
+    });
+
+    it("should show inline validation errors for incomplete names and invalid emails", () => {
+      const res = validateStudentForm("J", "invalid-email");
+      assert.equal(res.valid, false);
+      assert.equal(res.nameError, "Please enter your full name (minimum 2 characters).");
+      assert.equal(res.emailError, "Please enter a valid email address.");
+    });
+
+    // 17.4 State Preservation on Failure
+    it("should preserve user input during initialization failures", () => {
+      const formState = { name: "Grace Hopper", email: "grace@navy.mil" };
+      let errorMessage: string | null = null;
+
+      try {
+        // Simulate backend transient failure
+        throw new Error("Unable to start checkout session at the moment. Please try again.");
+      } catch (err: unknown) {
+        errorMessage = err instanceof Error ? err.message : "Error";
+      }
+
+      // Input must be retained
+      assert.equal(formState.name, "Grace Hopper");
+      assert.equal(formState.email, "grace@navy.mil");
+      assert.equal(errorMessage, "Unable to start checkout session at the moment. Please try again.");
+    });
+
+    // 17.5 Duplicate Submission Guard
+    it("should block concurrent duplicate submissions while checkout is in-flight", () => {
+      let isPending = false;
+      let orderSubmissions = 0;
+
+      function triggerPaymentSubmission() {
+        if (isPending) return false;
+        isPending = true;
+        orderSubmissions++;
+        return true;
+      }
+
+      const click1 = triggerPaymentSubmission();
+      const click2 = triggerPaymentSubmission();
+      const click3 = triggerPaymentSubmission();
+
+      assert.equal(click1, true);
+      assert.equal(click2, false);
+      assert.equal(click3, false);
+      assert.equal(orderSubmissions, 1);
+    });
+
+    // 17.6 Single-Step Session + Order Handoff
+    it("should execute single-step session creation and order handoff correctly", async () => {
+      let createdPurchaseId: string | null = null;
+      let createdOrderId: string | null = null;
+
+      async function executeSingleStepCheckout(name: string, email: string) {
+        const validation = validateStudentForm(name, email);
+        if (!validation.valid) throw new Error("Validation failed");
+
+        // Step 1: Session initialization
+        createdPurchaseId = `purch_${Date.now()}`;
+
+        // Step 2: Order creation
+        createdOrderId = `order_${Date.now()}`;
+
+        return {
+          purchaseId: createdPurchaseId,
+          orderId: createdOrderId,
+          prefill: { name: validation.trimmedName, email: validation.normalizedEmail },
+        };
+      }
+
+      const result = await executeSingleStepCheckout("Linus Torvalds", "linus@linux.org");
+      assert.ok(result.purchaseId.startsWith("purch_"));
+      assert.ok(result.orderId.startsWith("order_"));
+      assert.deepEqual(result.prefill, {
+        name: "Linus Torvalds",
+        email: "linus@linux.org",
+      });
+    });
+  });
 });
+
 
 

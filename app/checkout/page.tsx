@@ -5,7 +5,7 @@ import { CheckoutFlowClient } from "@/components/courses/CheckoutFlowClient";
 import Link from "next/link";
 import { ChevronLeft, ShieldCheck } from "lucide-react";
 import { getPurchaseSessionFromCookies } from "@/lib/purchase-session";
-import { EnrollModal } from "@/components/courses/EnrollModal";
+import { currentUser } from "@clerk/nextjs/server";
 
 export default async function CheckoutPage({
   searchParams,
@@ -76,6 +76,15 @@ export default async function CheckoutPage({
     );
   }
 
+  const user = await currentUser().catch(() => null);
+  const clerkName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim()
+    : "";
+  const clerkEmail = user?.emailAddresses?.[0]?.emailAddress || "";
+
+  const initialBuyerName = purchase?.buyerName || clerkName || "";
+  const initialBuyerEmail = purchase?.buyerEmail || clerkEmail || "";
+
   const batchId = targetBatch._id;
   const checkoutCourse = {
     id: course.id as Id<"courses">,
@@ -113,31 +122,17 @@ export default async function CheckoutPage({
           </div>
         </div>
 
-        {/* If purchase session exists, render the active checkout flow */}
-        {purchase ? (
-          <CheckoutFlowClient
-            course={checkoutCourse}
-            batch={checkoutBatch}
-            purchaseId={purchase.purchaseId}
-            buyerName={purchase.buyerName}
-            buyerEmail={purchase.buyerEmail}
-            appliedCoupon={purchase.couponCode}
-            discountAmount={purchase.discountAmount}
-            currentAmount={purchase.amount}
-          />
-        ) : (
-          /* Direct visit without buyer session: Prompt buyer details */
-          <div className="max-w-md mx-auto py-12">
-            <EnrollModal
-              isOpen={true}
-              onClose={() => {}}
-              courseSlug={course.slug}
-              courseTitle={course.title}
-              batchId={batchId}
-              price={course.price}
-            />
-          </div>
-        )}
+        {/* Embedded Unified Checkout Layout */}
+        <CheckoutFlowClient
+          course={checkoutCourse}
+          batch={checkoutBatch}
+          initialPurchaseId={purchase?.purchaseId}
+          initialBuyerName={initialBuyerName}
+          initialBuyerEmail={initialBuyerEmail}
+          appliedCoupon={purchase?.couponCode}
+          discountAmount={purchase?.discountAmount || 0}
+          currentAmount={purchase?.amount || course.price}
+        />
       </div>
     </main>
   );
