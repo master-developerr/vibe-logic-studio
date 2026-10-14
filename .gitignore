@@ -50,4 +50,6 @@ next-env.d.ts
 /memory.md
 .claude/
 .clerk/
+.agent/
+.impeccable/
 
