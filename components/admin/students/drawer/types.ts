@@ -35,4 +35,10 @@ export type DrawerStudentRow = {
   roleHistory?: Array<{ oldRole: string; newRole: string; changedBy: string; reason: string; date: number }>;
   accountStatus?: string;
   security?: { lastLogin: number; ip: string; device: string; mfaEnabled: boolean; verificationStatus: string };
+  enrollmentId?: string;
+  courseId?: string;
+  batchId?: string;
+  onboardingEmailStatus?: string;
+  onboardingEmailSentAt?: number;
+  onboardingEmailLastError?: string;
 };

@@ -417,7 +417,13 @@ export const claimPurchase = mutation({
       return { success: true, batchId: purchase.batchId, courseId: purchase.courseId };
     }
 
-    await ctx.db.insert("enrollments", {
+    const sentJob = await ctx.db
+      .query("emailJobs")
+      .withIndex("by_purchase_id", (q) => q.eq("purchaseId", purchase._id))
+      .filter((q) => q.eq(q.field("status"), "sent"))
+      .first();
+
+    const enrollmentId = await ctx.db.insert("enrollments", {
       userId: user._id,
       courseId: purchase.courseId,
       batchId: purchase.batchId,
@@ -426,7 +432,22 @@ export const claimPurchase = mutation({
       progress: 0,
       enrolledAt: Date.now(),
       completedLessons: [],
+      onboardingEmailStatus: sentJob ? "sent" : "pending",
+      onboardingEmailSentAt: sentJob?.lastAttemptAt,
+      onboardingEmailMessageId: sentJob?.resendMessageId,
     });
+
+    const relatedJobs = await ctx.db
+      .query("emailJobs")
+      .withIndex("by_purchase_id", (q) => q.eq("purchaseId", purchase._id))
+      .collect();
+
+    for (const j of relatedJobs) {
+      await ctx.db.patch(j._id, {
+        enrollmentId,
+        userId: user._id,
+      });
+    }
 
     return { success: true, batchId: purchase.batchId, courseId: purchase.courseId };
   },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { dispatchPurchaseEmail } from "@/lib/email-dispatch-service";
+import { dispatchPurchaseEmail, dispatchJobById } from "@/lib/email-dispatch-service";
 import { sendWelcomeAccessEmail } from "@/lib/resend";
 
 const MAX_BATCH_DISPATCH_LIMIT = 10;
@@ -62,11 +62,23 @@ export async function POST(req: NextRequest) {
     const baseUrl = `${protocol}://${host}`;
 
     // 2. Parse request payload if present
-    let body: { purchaseId?: string } = {};
+    let body: { purchaseId?: string; jobId?: string } = {};
     try {
       body = await req.json();
     } catch {
       // Empty body is valid for scheduled queue drain
+    }
+
+    // Single-job targeted dispatch
+    if (body.jobId) {
+      const result = await dispatchJobById(body.jobId, baseUrl);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error || "Failed to dispatch email" },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ success: true, message: result.message });
     }
 
     // Single-purchase targeted dispatch
@@ -91,9 +103,11 @@ export async function POST(req: NextRequest) {
         break; // Queue is empty
       }
 
-      const claimUrl = `${baseUrl}/claim?purchaseId=${job.purchaseId}${
-        job.rawRecoveryToken ? `&recovery=${job.rawRecoveryToken}` : ""
-      }`;
+      const claimUrl = job.purchaseId
+        ? `${baseUrl}/claim?purchaseId=${job.purchaseId}${
+            job.rawRecoveryToken ? `&recovery=${job.rawRecoveryToken}` : ""
+          }`
+        : `${baseUrl}/dashboard`;
 
       const emailResult = await sendWelcomeAccessEmail({
         to: job.recipientEmail,

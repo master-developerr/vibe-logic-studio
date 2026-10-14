@@ -117,6 +117,11 @@ export default defineSchema({
     certificateStatus: v.optional(v.string()), // "Eligible" | "Issued" | "Pending" | "Downloaded"
     attendancePercentage: v.optional(v.number()),
     completedLessons: v.optional(v.array(v.id("studyMaterials"))),
+    onboardingEmailStatus: v.optional(v.string()), // "pending" | "sent" | "failed"
+    onboardingEmailSentAt: v.optional(v.number()),
+    onboardingEmailLastError: v.optional(v.string()),
+    onboardingEmailRetryCount: v.optional(v.number()),
+    onboardingEmailMessageId: v.optional(v.string()),
   }).index("by_user_id", ["userId"])
     .index("by_course_id", ["courseId"])
     .index("by_batch_id", ["batchId"])
@@ -421,7 +426,11 @@ export default defineSchema({
     .index("by_is_active", ["isActive"]),
 
   emailJobs: defineTable({
-    purchaseId: v.id("purchases"),
+    purchaseId: v.optional(v.id("purchases")),
+    enrollmentId: v.optional(v.id("enrollments")),
+    userId: v.optional(v.id("users")),
+    courseId: v.optional(v.id("courses")),
+    batchId: v.optional(v.id("batches")),
     recipientEmail: v.string(),
     recipientName: v.string(),
     type: v.string(), // "welcome_access" | "purchase_receipt"
@@ -433,5 +442,7 @@ export default defineSchema({
     rawRecoveryToken: v.optional(v.string()), // Temporarily stored until sent, then redacted
     createdAt: v.number(),
   }).index("by_status", ["status"])
-    .index("by_purchase_id", ["purchaseId"]),
+    .index("by_purchase_id", ["purchaseId"])
+    .index("by_enrollment_id", ["enrollmentId"])
+    .index("by_recipient_email", ["recipientEmail"]),
 });

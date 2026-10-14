@@ -277,6 +277,12 @@ export const getAllStudents = query({
             progress,
             enrolledAt,
             enrollmentStatus: activeEnrollment?.status ?? "—",
+            enrollmentId: activeEnrollment?._id,
+            courseId: activeEnrollment?.courseId,
+            batchId: activeEnrollment?.batchId,
+            onboardingEmailStatus: activeEnrollment?.onboardingEmailStatus ?? "pending",
+            onboardingEmailSentAt: activeEnrollment?.onboardingEmailSentAt,
+            onboardingEmailLastError: activeEnrollment?.onboardingEmailLastError,
             createdAt: new Date(student.createdAt).toISOString(),
             // Extended Enterprise Fields
             role: student.role,
@@ -572,6 +578,7 @@ export const manualEnrollStudent = mutation({
       .filter((q) => q.eq(q.field("email"), args.studentEmail))
       .first();
 
+    const isNewUser = !student;
     if (!student) {
       const newUserId = await ctx.db.insert("users", {
         clerkId: `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`,
@@ -582,6 +589,7 @@ export const manualEnrollStudent = mutation({
         createdAt: Date.now(),
       });
       student = (await ctx.db.get(newUserId))!;
+      console.log(`[ONBOARDING] Student created: ${student.email} (${student._id})`);
     } else if (student.role !== "student" && student.role !== "admin") {
       await ctx.db.patch(student._id, { role: "student" });
     }
@@ -594,14 +602,34 @@ export const manualEnrollStudent = mutation({
 
     if (existing) throw new Error("Student is already enrolled in this course.");
 
-    await ctx.db.insert("enrollments", {
+    const now = Date.now();
+    const enrollmentId = await ctx.db.insert("enrollments", {
       userId: student._id,
       courseId: args.courseId,
       batchId: args.batchId,
       status: "active",
       progress: 0,
-      enrolledAt: Date.now(),
+      enrolledAt: now,
+      onboardingEmailStatus: "pending",
     });
+
+    // Enqueue onboarding email job
+    const emailJobId = await ctx.db.insert("emailJobs", {
+      enrollmentId,
+      userId: student._id,
+      courseId: args.courseId,
+      batchId: args.batchId,
+      recipientEmail: student.email,
+      recipientName: student.name || "Student",
+      type: "welcome_access",
+      status: "pending",
+      attempts: 0,
+      createdAt: now,
+    });
+
+    console.log(
+      `[ONBOARDING] Enrollment confirmed: ${student.email} in batch ${args.batchId}. Enqueued emailJob ${emailJobId}`
+    );
 
     // Update enrolled count on batch
     const batch = await ctx.db.get(args.batchId);
@@ -609,7 +637,13 @@ export const manualEnrollStudent = mutation({
       await ctx.db.patch(args.batchId, { enrolledCount: batch.enrolledCount + 1 });
     }
 
-    return { success: true, studentName: student.name };
+    return {
+      success: true,
+      studentName: student.name,
+      enrollmentId,
+      emailJobId,
+      isNewUser,
+    };
   },
 });
 
