@@ -11,14 +11,14 @@ import FinalCTA from "./_components/FinalCTA";
 import Footer from "./_components/Footer";
 
 /**
- * Vibe Logic Studio — Course Landing Page: AI Build Sprint V2
+ * Vibe Logic Studio — Course Landing Page: AI Build Sprint
  * Route: /ai-build-sprint
  *
- * Major Visual Redesign V2:
+ * Production Release:
  * - Real User Projects: Diligence Live, TicketLelo, Sherhan, KBG
- * - Colorful authentic developer tool ecosystem & animated marquee
- * - 4-stage visual learning progression with real tool logos
- * - 5-step connected storytelling: Idea → Interface → Build → Test → Publish
+ * - Interactive AI Building Workspace window & prompt spec editor
+ * - Animated Editorial Typography with upward/downward letterform extensions
+ * - High-performance horizontal tool marquee
  * - 7-day progressive curriculum timeline with phase tags & deliverables
  * - Unified ₹999 checkout: /checkout?courseSlug=ai-build-sprint
  */
