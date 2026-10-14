@@ -14,31 +14,26 @@ export default function EditorialTypography() {
     offset: ["start end", "end start"],
   });
 
-  // Spring physics configuration for responsive, weighted scrub
-  const springConfig = { stiffness: 90, damping: 22, mass: 0.15 };
+  // Spring physics configuration for responsive, smooth scrub without jitter
+  const springConfig = { stiffness: 100, damping: 24, mass: 0.12 };
 
-  // 1. Upper extension: grows UPWARD from 'I' in 'IMAGINE.' into the ivory section
-  const rawUpperScaleY = useTransform(scrollYProgress, [0.10, 0.55], [0.1, 1]);
-  const smoothUpperScaleY = useSpring(rawUpperScaleY, springConfig);
+  // 1. Upper extension: originates at top boundary divider (y = -34) and draws DOWNWARD to meet 'I' at y = 0
+  const rawUpperHeight = useTransform(scrollYProgress, [0.06, 0.42], [6, 34]);
+  const smoothUpperHeight = useSpring(rawUpperHeight, springConfig);
 
-  // 2. Lower extension: grows DOWNWARD from 'P' in 'SHIP IT.' toward bottom boundary
-  const rawLowerScaleY = useTransform(scrollYProgress, [0.20, 0.70], [0.08, 1]);
-  const smoothLowerScaleY = useSpring(rawLowerScaleY, springConfig);
-
-  // 3. Secondary parallax glide for the orange CTA bar
-  const rawBarY = useTransform(scrollYProgress, [0.18, 0.75], [-25, 65]);
-  const smoothBarY = useSpring(rawBarY, springConfig);
+  // 2. Lower extension: originates at 'P' baseline (y = 100) and draws DOWNWARD toward bottom boundary divider (y = 136)
+  const rawLowerHeight = useTransform(scrollYProgress, [0.16, 0.58], [6, 36]);
+  const smoothLowerHeight = useSpring(rawLowerHeight, springConfig);
 
   // Reduced motion fallbacks: render full static extensions with zero motion
-  const activeUpperScaleY = shouldReduceMotion ? 1 : smoothUpperScaleY;
-  const activeLowerScaleY = shouldReduceMotion ? 1 : smoothLowerScaleY;
-  const activeBarY = shouldReduceMotion ? 0 : smoothBarY;
+  const activeUpperHeight = shouldReduceMotion ? 34 : smoothUpperHeight;
+  const activeLowerHeight = shouldReduceMotion ? 36 : smoothLowerHeight;
 
   return (
     <section
       ref={sectionRef}
-      className="relative bg-[#0E0E0E] text-[#F1EDE4] py-20 sm:py-28 lg:py-36 overflow-visible z-20 border-b border-[#242424] select-none"
-      aria-label="Editorial Statement — Imagine. Build with AI. Ship it."
+      className="relative bg-[#0E0E0E] text-[#F1EDE4] py-8 sm:py-12 lg:py-14 overflow-visible z-20 border-b border-[#242424] select-none"
+      aria-label="Editorial Statement — Imagine. Build with AI. Ship."
       id="statement"
     >
       {/* Architectural subtle ambient background grid */}
@@ -52,89 +47,76 @@ export default function EditorialTypography() {
         aria-hidden="true"
       />
 
-      {/* Ambient radial ember glow centered behind the composition */}
-      <div
-        className="absolute top-1/2 left-1/3 -translate-y-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(255,87,34,0.08),transparent)] pointer-events-none"
-        aria-hidden="true"
-      />
-
       <div className="max-w-[1360px] mx-auto px-5 sm:px-8 lg:px-12 relative z-10">
         
         {/* ========================================================= */}
-        {/* TOP METADATA ROW: Indented Index Label & Supporting Copy  */}
-        {/* Indented left to provide an unobstructed vertical channel */}
-        {/* for the upper extension stroke to soar into ivory section */}
+        {/* TOP METADATA ROW: Studio Manifesto Label & Supporting Copy */}
+        {/* Strictly aligned to main content grid                      */}
         {/* ========================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-8 sm:pb-12 border-b border-[#222222]">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-3.5 sm:pb-5 border-b border-[#222222]">
           
-          {/* Studio Index Label (Indented to clear the 'I' stroke corridor) */}
-          <div className="pl-12 sm:pl-20 lg:pl-28 flex items-center gap-3 font-mono text-[11px] sm:text-xs text-[#888888] tracking-widest uppercase">
+          {/* Studio Index Label */}
+          <div className="flex items-center gap-3 font-mono text-[11px] sm:text-xs text-[#888888] tracking-widest uppercase">
             <span className="w-1.5 h-1.5 rounded-full bg-[#FF5722]" />
             <span className="text-[#FF5722] font-semibold">01 / AI BUILD SPRINT</span>
             <span className="text-[#444444] hidden sm:inline">|</span>
             <span className="hidden sm:inline text-[#777777]">MANIFESTO</span>
           </div>
 
-          {/* Supporting Paragraph (Positioned Right, matching art direction) */}
+          {/* Supporting Description */}
           <div className="max-w-[42ch]">
-            <p className="text-sm sm:text-[15px] text-[#A3A3A3] leading-relaxed font-sans font-normal">
+            <p className="text-xs sm:text-sm text-[#A3A3A3] leading-relaxed font-sans font-normal">
               Seven days. Real projects. Go from an idea to a live website using modern AI tools.
             </p>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* MAIN TYPOGRAPHIC COMPOSITION (3 INDEPENDENT LAYERS)        */}
-        {/* Accessible screen reader announcement for entire heading  */}
+        {/* MAIN TYPOGRAPHIC COMPOSITION                               */}
+        {/* Compact, architectural, zero loose gaps                    */}
         {/* ========================================================= */}
         <div
-          className="pt-8 sm:pt-12 lg:pt-16 pb-12 sm:pb-16 lg:pb-24 relative"
+          className="pt-6 sm:pt-8 lg:pt-10 pb-6 sm:pb-8 lg:pb-10 relative flex flex-col justify-center"
           role="heading"
           aria-level={2}
-          aria-label="IMAGINE. BUILD WITH AI. SHIP IT."
+          aria-label="IMAGINE. BUILD WITH AI. SHIP."
         >
           
           {/* ------------------------------------------------------- */}
-          {/* LINE 1: "IMAGINE." with scroll-growing upper extension   */}
+          {/* LINE 1: "IMAGINE." with scroll-revealing upper stroke    */}
+          {/* Stroke originates ABOVE and extends DOWNWARD to 'I'      */}
           {/* ------------------------------------------------------- */}
           <div
-            className="relative z-10 mb-2 sm:mb-3 flex items-baseline"
+            className="relative z-10 flex items-baseline leading-none"
             aria-hidden="true"
           >
-            <div className="flex items-baseline font-black tracking-[-0.04em] text-[13vw] sm:text-[11vw] lg:text-[10rem] leading-none text-[#F1EDE4]">
+            <div className="flex items-baseline font-black tracking-[-0.04em] text-[12vw] sm:text-[10vw] lg:text-[7.5rem] xl:text-[8.5rem] leading-none text-[#F1EDE4]">
               
               {/* Custom SVG Glyph for 'I':
-                  SVG height is exactly 0.95em (matching cap-height of MAGINE.).
-                  Base stem sits on the baseline.
-                  The scroll-animated upper stroke extends from y=0 upwards by 380 units,
-                  soaring into the preceding ivory section with mix-blend-difference. */}
-              <div className="relative inline-flex items-baseline mr-[0.03em] flex-shrink-0">
+                  Cap-height sits from y=0 to baseline y=100 (matching MAGINE.).
+                  The upper extension originates at top divider (y=-34) and
+                  expands DOWNWARD with height to seamlessly connect to y=0. */}
+              <div className="relative inline-flex items-baseline mr-[0.02em] flex-shrink-0">
                 <svg
-                  viewBox="0 0 24 100"
+                  viewBox="0 0 20 100"
                   className="inline-block fill-current overflow-visible flex-shrink-0"
                   style={{
-                    width: "0.20em",
+                    width: "0.17em",
                     height: "0.95em",
                   }}
                   aria-hidden="true"
                 >
                   {/* Base 'I' stem (cap-height 0 to baseline 100) */}
-                  <rect x="0" y="0" width="24" height="100" fill="currentColor" />
+                  <rect x="0" y="0" width="20" height="100" fill="currentColor" />
 
-                  {/* Scroll-animated UPPER EXTENSION (growing upward from y=0 to y=-380):
-                      Crossing past the top border into the preceding ivory section.
-                      Uses mix-blend-difference: off-white on black, inverts to black on ivory. */}
+                  {/* Scroll-animated UPPER EXTENSION:
+                      Locked at y=-34 (top boundary divider). Height grows DOWNWARD to reach y=0. */}
                   <motion.rect
                     x="0"
-                    y="-380"
-                    width="24"
-                    height="380"
+                    y="-34"
+                    width="20"
+                    height={activeUpperHeight}
                     fill="currentColor"
-                    className="mix-blend-difference will-change-transform"
-                    style={{
-                      scaleY: activeUpperScaleY,
-                      transformOrigin: "0px 0px",
-                    }}
                   />
                 </svg>
               </div>
@@ -144,31 +126,28 @@ export default function EditorialTypography() {
           </div>
 
           {/* ------------------------------------------------------- */}
-          {/* LINE 2: SCROLL-LINKED PARALLAX ORANGE CTA BAR           */}
-          {/* Moves vertically through the composition as user scrolls */}
+          {/* LINE 2: GROUNDED ORANGE EDITORIAL PHASE BAND             */}
+          {/* Structurally integrated, clean horizontal divider        */}
           {/* ------------------------------------------------------- */}
-          <motion.div
-            style={{ y: activeBarY }}
-            className="relative z-30 my-3 sm:my-4 lg:my-5 will-change-transform"
-          >
-            <div className="w-full sm:w-[92%] lg:w-[86%] bg-[#FF5722] text-white rounded-md sm:rounded-lg shadow-[0_16px_40px_rgba(255,87,34,0.32)] overflow-hidden">
+          <div className="relative z-20 my-2 sm:my-2.5 lg:my-3 w-full">
+            <div className="w-full bg-[#FF5722] text-white border-y border-[#FF7043]/30">
               <Link
                 href="/checkout?courseSlug=ai-build-sprint"
-                className="group flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 sm:px-8 lg:px-10 py-3.5 sm:py-5 lg:py-6 transition-colors hover:bg-[#F4511E] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0E0E0E]"
-                aria-label="Build with AI — Join the Bootcamp for ₹999"
+                className="group flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 sm:px-8 lg:px-10 py-3 sm:py-3.5 lg:py-4 transition-colors hover:bg-[#F4511E] active:bg-[#E64A19] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0E0E0E]"
+                aria-label="Phase 01: Build with AI — Join the Bootcamp"
               >
-                {/* Left Text inside orange bar: "BUILD WITH AI" */}
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs sm:text-sm font-bold tracking-wider uppercase text-white/80 bg-black/20 px-2 py-0.5 rounded">
+                {/* Left: Phase indicator + Build with AI title */}
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <span className="font-mono text-[11px] sm:text-xs font-bold tracking-wider uppercase text-white/90 bg-black/25 px-2.5 py-1 rounded-sm">
                     PHASE // 01
                   </span>
-                  <span className="font-black tracking-tight text-xl sm:text-2xl lg:text-3xl uppercase text-white">
+                  <span className="font-black tracking-tight text-lg sm:text-xl lg:text-2xl uppercase text-white">
                     BUILD WITH AI
                   </span>
                 </div>
 
-                {/* Right Interactive Action Badge */}
-                <div className="flex items-center gap-2 font-mono text-xs sm:text-sm font-bold tracking-wider uppercase text-white bg-black/25 px-4 py-2 rounded-md group-hover:bg-black/35 transition-all">
+                {/* Right: Integrated Action Button */}
+                <div className="flex items-center gap-2 font-mono text-xs sm:text-sm font-bold tracking-wider uppercase text-white bg-black/25 group-hover:bg-black/35 px-4 py-1.5 sm:py-2 rounded-sm transition-all">
                   <span>Build with AI</span>
                   <svg
                     width="14"
@@ -188,23 +167,25 @@ export default function EditorialTypography() {
                 </div>
               </Link>
             </div>
-          </motion.div>
+          </div>
 
           {/* ------------------------------------------------------- */}
-          {/* LINE 3: "SHIP IT." with scroll-growing lower extension   */}
+          {/* LINE 3: "SHIP." with scroll-revealing lower stroke       */}
+          {/* Stroke originates from 'P' stem and extends DOWNWARD     */}
           {/* ------------------------------------------------------- */}
           <div
-            className="relative z-20 mt-2 sm:mt-3 flex items-baseline"
+            className="relative z-10 flex items-baseline leading-none"
             aria-hidden="true"
           >
-            <div className="flex items-baseline font-black tracking-[-0.04em] text-[13vw] sm:text-[11vw] lg:text-[10rem] leading-none text-[#F1EDE4]">
+            <div className="flex items-baseline font-black tracking-[-0.04em] text-[12vw] sm:text-[10vw] lg:text-[7.5rem] xl:text-[8.5rem] leading-none text-[#F1EDE4]">
               <span className="flex-shrink-0">SHI</span>
 
               {/* Custom SVG Glyph for Uppercase 'P':
-                  SVG height is exactly 0.95em (matching cap-height and baseline of SHI and IT.).
-                  Bowl is perfectly level with S, H, I, T.
-                  The scroll-animated lower stroke extends from y=100 downwards by 320 units. */}
-              <div className="relative inline-flex items-baseline ml-[0.01em] mr-[0.05em] flex-shrink-0">
+                  Height is exactly 0.95em (matching SHI and '.').
+                  Left stem x=0 to x=20.
+                  The scroll-animated lower stroke originates at baseline y=100
+                  and extends DOWNWARD toward the bottom boundary divider. */}
+              <div className="relative inline-flex items-baseline ml-[0.01em] flex-shrink-0">
                 <svg
                   viewBox="0 0 84 100"
                   className="inline-block fill-current overflow-visible flex-shrink-0"
@@ -214,31 +195,26 @@ export default function EditorialTypography() {
                   }}
                   aria-hidden="true"
                 >
-                  {/* Uppercase 'P' Bowl & Base Stem (from y=0 to y=100, sitting level with SHI and IT.) */}
+                  {/* Uppercase 'P' Bowl & Base Stem */}
                   <path
                     fillRule="evenodd"
-                    d="M 0 0 H 50 C 72 0, 84 22, 84 50 C 84 78, 72 100, 50 100 H 22 V 100 H 0 Z M 22 22 H 48 C 60 22, 64 34, 64 50 C 64 66, 60 78, 48 78 H 22 Z"
+                    d="M 0 0 H 50 C 72 0, 84 22, 84 50 C 84 78, 72 100, 50 100 H 20 V 100 H 0 Z M 20 20 H 48 C 60 20, 64 34, 64 50 C 64 66, 60 80, 48 80 H 20 Z"
                     fill="currentColor"
                   />
 
-                  {/* Scroll-animated LOWER EXTENSION (growing downward from y=100 toward bottom boundary):
-                      Continuously attached to the stem of 'P' with identical stem width (22). */}
+                  {/* Scroll-animated LOWER EXTENSION:
+                      Locked at y=100 (baseline of 'P'). Height grows DOWNWARD. */}
                   <motion.rect
                     x="0"
                     y="100"
-                    width="22"
-                    height="320"
+                    width="20"
+                    height={activeLowerHeight}
                     fill="currentColor"
-                    className="will-change-transform"
-                    style={{
-                      scaleY: activeLowerScaleY,
-                      transformOrigin: "0px 100px",
-                    }}
                   />
                 </svg>
               </div>
 
-              <span className="flex-shrink-0 ml-[0.02em]">IT.</span>
+              <span className="flex-shrink-0">.</span>
             </div>
           </div>
 
@@ -246,8 +222,9 @@ export default function EditorialTypography() {
 
         {/* ========================================================= */}
         {/* BOTTOM METADATA BAR: Accurate Bootcamp Details & Indicator  */}
+        {/* Strictly aligned to grid                                  */}
         {/* ========================================================= */}
-        <div className="pt-8 sm:pt-10 border-t border-[#222222] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-mono text-[#888888] relative z-20">
+        <div className="pt-4 sm:pt-6 border-t border-[#222222] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-mono text-[#888888] relative z-20">
           
           {/* Bottom-left: Accurate Bootcamp Offer details */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -291,3 +268,4 @@ export default function EditorialTypography() {
     </section>
   );
 }
+
