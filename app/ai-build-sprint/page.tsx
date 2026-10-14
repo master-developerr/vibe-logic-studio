@@ -1,7 +1,6 @@
 import Navbar from "./_components/Navbar";
 import Hero from "./_components/Hero";
 import ToolEcosystem from "./_components/ToolEcosystem";
-import EditorialTypography from "./_components/EditorialTypography";
 import ProjectShowcase from "./_components/ProjectShowcase";
 import CurriculumSection from "./_components/CurriculumSection";
 import StudentOutcomes from "./_components/StudentOutcomes";
@@ -58,10 +57,7 @@ export default function AIBuildSprintCoursePage() {
         {/* 03 — Developer Tool Ecosystem: Real colorful logos & marquee */}
         <ToolEcosystem />
 
-        {/* 04 — Animated Editorial Statement Section: Imagine. Build with AI. Ship it. */}
-        <EditorialTypography />
-
-        {/* 05 — Project Showcase: Real Websites (TicketLelo, Diligence Live, KBG, Sherhan) */}
+        {/* 04 — Project Showcase: Real Websites (TicketLelo, Diligence Live, KBG, Sherhan) */}
         <ProjectShowcase />
 
         {/* 05 — 7-Day Curriculum: Interactive timeline & daily milestones */}
