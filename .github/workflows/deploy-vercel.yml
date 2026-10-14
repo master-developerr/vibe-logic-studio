@@ -12,5 +12,5 @@ jobs:
     steps:
       - name: Ping Vercel Deploy Hook
         run: |
-          response=$(curl -s -X POST "https://api.vercel.com/v1/integrations/deploy/prj_gNjhebjfszrZfFk167JM7D44UObK/74roJ6CntQ")
+          response=$(curl -s -X POST "https://api.vercel.com/v1/integrations/deploy/prj_gNjhebjfszrZfFk167JM7D44UObK/eKmZf81abT")
           echo "Vercel Deploy Response: $response"
